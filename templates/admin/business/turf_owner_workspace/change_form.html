@@ -1,0 +1,27 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block after_field_sets %}
+<div class="workspace-sections">
+  <section class="workspace-card">
+    <div class="workspace-heading">
+      <div><h2>Customers</h2><p>Customers belonging to {{ workspace_owner.business_settings.business_name }}</p></div>
+      <span>{{ workspace_customers|length }} records</span>
+    </div>
+    <div class="workspace-table-wrap"><table class="workspace-table">
+      <thead><tr><th>Primary key</th><th>Customer name</th><th>Phone</th><th>Email</th><th>Bookings</th></tr></thead>
+      <tbody>{% for customer in workspace_customers %}<tr><td>{{ customer.pk }}</td><td><a href="{% url 'admin:bookings_customer_change' customer.pk %}">{{ customer.name }}</a></td><td>{{ customer.phone }}</td><td>{{ customer.email|default:"—" }}</td><td>{{ customer.booking_total }}</td></tr>{% empty %}<tr><td colspan="5" class="workspace-empty">No customers in this turf folder.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+  <section class="workspace-card">
+    <div class="workspace-heading">
+      <div><h2>Expenses</h2><p>Expenses belonging to {{ workspace_owner.business_settings.business_name }}</p></div>
+      <span>{{ workspace_expenses|length }} records</span>
+    </div>
+    <div class="workspace-table-wrap"><table class="workspace-table">
+      <thead><tr><th>Primary key</th><th>Category</th><th>Date</th><th>Amount</th><th>Notes</th></tr></thead>
+      <tbody>{% for expense in workspace_expenses %}<tr><td>{{ expense.pk }}</td><td><a href="{% url 'admin:expenses_expense_change' expense.pk %}">{{ expense.category }}</a></td><td>{{ expense.expense_date }}</td><td>{{ workspace_owner.business_settings.currency }}{{ expense.amount }}</td><td>{{ expense.notes|default:"—"|truncatechars:70 }}</td></tr>{% empty %}<tr><td colspan="5" class="workspace-empty">No expenses in this turf folder.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+</div>
+{% endblock %}

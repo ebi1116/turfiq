@@ -1,0 +1,6 @@
+{% extends 'base.html' %}{% load crispy_forms_tags %}
+{% block page_name %}Customers{% endblock %}
+{% block content %}
+<section class="page-title"><div><span class="eyebrow">NEW CUSTOMER</span><h1>Add a customer</h1><p>Create a customer profile for future bookings.</p></div></section>
+<article class="panel form-panel"><form method="post">{% csrf_token %}{{ form|crispy }}<div class="form-actions"><a href="{% url 'customer-list' %}" class="btn btn-light">Cancel</a><button class="btn btn-primary"><i class="fa-solid fa-user-plus me-2"></i>Add customer</button></div></form></article>
+{% endblock %}

@@ -1,0 +1,66 @@
+# TurfIQ Analytics
+
+A production-minded Django business intelligence dashboard for turf owners. It tracks manual bookings, customers and expenses, then generates revenue, growth, occupancy, retention, payment, sport and peak-hour analytics.
+
+## Quick start
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py seed_demo
+python manage.py runserver
+```
+
+Open `http://127.0.0.1:8000/accounts/login/` and continue with Google. TurfIQ has no public username, password, registration, recovery, or OTP flow.
+
+## Google OAuth setup
+
+1. In Google Cloud Console, create an OAuth 2.0 Client ID for a **Web application**.
+2. Add both local addresses as authorized JavaScript origins:
+
+   - `http://127.0.0.1:8000`
+   - `http://localhost:8000`
+3. Add this exact authorized redirect URI:
+
+   - `http://127.0.0.1:8000/accounts/google/login/callback/`
+   - `http://localhost:8000/accounts/google/login/callback/`
+
+Google compares redirect URIs exactly. The scheme, hostname, port, path, and trailing slash must match the address used to open TurfIQ.
+
+4. Configure credentials before starting Django:
+
+```powershell
+$env:GOOGLE_OAUTH_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+$env:GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
+python manage.py runserver
+```
+
+For production, replace the origin and callback with the public HTTPS domain. Do not configure a duplicate Google `SocialApp` in Django admin while environment credentials are enabled; allauth requires one configuration source per provider.
+
+On first Google authentication, TurfIQ automatically creates an active Owner, stores the verified email, full name, Google subject ID and profile picture, sets an unusable local password, starts a Django session, and redirects to `/dashboard/`.
+
+## Production configuration
+
+Set `DJANGO_DEBUG=0`, `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `DATABASE_URL` (PostgreSQL URL). Static assets can then be collected with `python manage.py collectstatic`.
+
+### Razorpay Premium billing
+
+All non-superuser accounts receive a seven-day full-feature trial. They can authorize Razorpay autopay during the trial; billing begins when the trial ends and continues at ₹199/month. Create a monthly ₹199 plan in Razorpay and configure:
+
+```powershell
+$env:RAZORPAY_KEY_ID="rzp_test_..."
+$env:RAZORPAY_KEY_SECRET="..."
+$env:RAZORPAY_PLAN_ID="plan_..."
+$env:RAZORPAY_WEBHOOK_SECRET="a-separate-strong-webhook-secret"
+```
+
+Configure the public HTTPS webhook URL as `https://your-domain.example/billing/webhook/` and enable subscription events, particularly authenticated, activated, charged, updated, halted, cancelled, and completed. Superusers bypass the subscription gate.
+
+## Verification
+
+```powershell
+python manage.py check
+python manage.py test
+```

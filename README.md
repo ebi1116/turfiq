@@ -43,7 +43,7 @@ On first Google authentication, TurfIQ automatically creates an active Owner, st
 
 ## Production configuration
 
-Set `DJANGO_DEBUG=0`, `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `DATABASE_URL` (PostgreSQL URL). Static assets can then be collected with `python manage.py collectstatic`.
+Set `DJANGO_DEBUG=0`, `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and `DATABASE_URL` (PostgreSQL URL). For non-Render deployments, also set `DJANGO_CSRF_TRUSTED_ORIGINS` to the comma-separated HTTPS origins that submit forms. Render's `RENDER_EXTERNAL_HOSTNAME` is automatically added to both the allowed hosts and trusted origins. Static assets can then be collected with `python manage.py collectstatic`.
 
 ### Razorpay Premium billing
 

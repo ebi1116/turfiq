@@ -27,6 +27,7 @@ if RENDER_EXTERNAL_HOSTNAME:
 INSTALLED_APPS = [
     "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes",
     "django.contrib.sessions", "django.contrib.messages", "django.contrib.staticfiles",
+    "django.contrib.sites",
     "rest_framework", "allauth", "allauth.account", "allauth.socialaccount",
     "allauth.socialaccount.providers.google", "crispy_forms", "crispy_bootstrap5",
     "accounts.apps.AccountsConfig", "business", "bookings", "expenses", "dashboard", "reports", "subscriptions", "marketing", "tournaments",
@@ -79,6 +80,7 @@ STORAGES = {
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+SITE_ID = 1
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
     "allauth.account.auth_backends.AuthenticationBackend",

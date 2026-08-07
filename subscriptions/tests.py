@@ -40,6 +40,16 @@ class PremiumAccessTests(TestCase):
         self.client.force_login(user)
         self.assertEqual(self.client.get(reverse("dashboard")).status_code, 200)
 
+    def test_admin_login_is_not_blocked_by_billing(self):
+        user = User.objects.create_user("expired-owner", password="password")
+        Subscription.objects.create(owner=user, status="trialing", trial_end=timezone.now() - timedelta(seconds=1))
+        self.client.force_login(user)
+
+        response = self.client.post(reverse("admin:login"), {"username": user.username, "password": "password"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(response.get("Location"), reverse("billing"))
+
     def test_billing_page_shows_monthly_price(self):
         user = User.objects.create_user("billing-owner", password="password")
         self.client.force_login(user)

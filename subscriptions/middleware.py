@@ -5,7 +5,7 @@ from django.urls import reverse
 class PremiumAccessMiddleware:
     """Let owners explore TurfIQ, but require Premium for data changes."""
 
-    ALLOWED_PREFIXES = ("/billing/", "/accounts/", "/static/", "/media/")
+    ALLOWED_PREFIXES = ("/admin/", "/billing/", "/accounts/", "/static/", "/media/")
 
     def __init__(self, get_response):
         self.get_response = get_response

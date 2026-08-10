@@ -1,10 +1,12 @@
 import json
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
@@ -21,7 +23,9 @@ def billing(request):
     checkout = None
     if request.method == "POST":
         try:
-            remote = create_razorpay_subscription(request.user)
+            subscription.trial_start = timezone.now()
+            subscription.trial_end = subscription.trial_start + timedelta(days=7)
+            remote = create_razorpay_subscription(request.user, subscription.trial_end)
             subscription.razorpay_subscription_id = remote["id"]
             subscription.razorpay_plan_id = settings.RAZORPAY_PLAN_ID
             subscription.status = remote.get("status", "created")
@@ -42,7 +46,7 @@ def verify_checkout(request):
             return JsonResponse({"ok": False, "error": "Invalid payment signature."}, status=400)
         subscription.razorpay_payment_id = payload["razorpay_payment_id"]
         subscription.status = "authenticated"
-        subscription.current_end = None
+        subscription.current_end = subscription.trial_end
         subscription.save(update_fields=["razorpay_payment_id", "status", "current_end", "updated_at"])
         return JsonResponse({"ok": True, "redirect": request.session.pop("premium_return_to", "/")})
     except (json.JSONDecodeError, KeyError, Subscription.DoesNotExist):
@@ -71,6 +75,8 @@ def razorpay_webhook(request):
         subscription.current_start = remote_start
     if remote_end:
         subscription.current_end = remote_end
+    elif subscription.status == "authenticated":
+        subscription.current_end = subscription.trial_end
     subscription.cancel_at_cycle_end = bool(entity.get("has_scheduled_changes"))
     subscription.save()
     if event_id:

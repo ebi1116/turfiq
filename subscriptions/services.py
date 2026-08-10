@@ -2,17 +2,20 @@ import base64
 import hashlib
 import hmac
 import json
+import ssl
+from datetime import datetime, timezone
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from django.conf import settings
+import certifi
 
 
 class RazorpayError(Exception):
     pass
 
 
-def create_razorpay_subscription(owner):
+def create_razorpay_subscription(owner, trial_end):
     if not all((settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET, settings.RAZORPAY_PLAN_ID)):
         raise RazorpayError("Razorpay is not configured. Add the API key, secret and monthly plan ID.")
     subscription_data = {
@@ -22,11 +25,14 @@ def create_razorpay_subscription(owner):
         "customer_notify": True,
         "notes": {"turfiq_owner_id": str(owner.pk), "email": owner.email},
     }
+    if trial_end.timestamp() > datetime.now(tz=timezone.utc).timestamp() + 60:
+        subscription_data["start_at"] = int(trial_end.timestamp())
     payload = json.dumps(subscription_data).encode()
     token = base64.b64encode(f"{settings.RAZORPAY_KEY_ID}:{settings.RAZORPAY_KEY_SECRET}".encode()).decode()
     request = Request("https://api.razorpay.com/v1/subscriptions", data=payload, headers={"Authorization": f"Basic {token}", "Content-Type": "application/json"}, method="POST")
     try:
-        with urlopen(request, timeout=20) as response:
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        with urlopen(request, timeout=20, context=ssl_context) as response:
             return json.loads(response.read())
     except HTTPError as exc:
         try: detail = json.loads(exc.read()).get("error", {}).get("description", "Razorpay rejected the request.")

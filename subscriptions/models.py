@@ -1,10 +1,11 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from datetime import timedelta
 
 
 def default_trial_end():
-    return timezone.now()
+    return timezone.now() + timedelta(days=7)
 
 
 class Subscription(models.Model):

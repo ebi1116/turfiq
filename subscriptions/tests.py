@@ -84,6 +84,9 @@ class PremiumAccessTests(TestCase):
         self.assertContains(response, 'id="razorpay-pay-button"')
         self.assertNotContains(response, "Authorize &amp; Start Trial")
         self.assertNotContains(response, "subscription_id")
+        self.assertContains(response, reverse("create-order"))
+        self.assertContains(response, reverse("verify-payment"))
+        self.assertIn("csrftoken", response.cookies)
 
     @override_settings(TEST_ACCOUNT_EMAIL="demo@turfiq.local")
     def test_configured_test_account_bypasses_premium_and_billing(self):

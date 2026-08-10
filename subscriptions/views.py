@@ -7,6 +7,7 @@ from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 
 from .models import Subscription, WebhookEvent
@@ -19,6 +20,7 @@ from .services import (
 
 
 @login_required
+@ensure_csrf_cookie
 def billing(request):
     if request.user.is_superuser or is_test_account(request.user):
         return redirect("dashboard")

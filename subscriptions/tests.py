@@ -9,23 +9,26 @@ from .models import Subscription
 
 
 class PremiumAccessTests(TestCase):
-    def test_regular_owner_without_subscription_is_sent_to_billing(self):
+    def test_regular_owner_without_subscription_can_open_dashboard_onboarding(self):
         user = User.objects.create_user("free-owner", password="password")
         self.client.force_login(user)
-        self.assertRedirects(self.client.get(reverse("dashboard")), reverse("billing"))
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "HOW TURFIQ WORKS")
 
-    def test_expired_trial_owner_is_sent_to_billing_when_saving(self):
+    def test_expired_trial_owner_is_sent_to_billing_when_opening_booking(self):
         user = User.objects.create_user("saving-owner", password="password")
         Subscription.objects.create(owner=user, status="trialing", trial_end=timezone.now() - timedelta(seconds=1))
         self.client.force_login(user)
-        response = self.client.post(reverse("customer-add"), {"name": "Blocked", "phone": "999"})
+        response = self.client.get(reverse("booking-add"))
         self.assertRedirects(response, reverse("billing"))
 
-    def test_new_owner_requires_own_premium_before_saving(self):
+    def test_new_owner_can_add_customer_but_booking_requires_premium(self):
         user = User.objects.create_user("new-owner", email="new-owner@example.com", password="password")
         self.client.force_login(user)
-        response = self.client.post(reverse("customer-add"), {"name": "Blocked Customer", "phone": "888"})
-        self.assertRedirects(response, reverse("billing"))
+        response = self.client.post(reverse("customer-add"), {"name": "Free Customer", "phone": "888"})
+        self.assertRedirects(response, reverse("customer-list"))
+        self.assertRedirects(self.client.get(reverse("booking-add")), reverse("billing"))
         subscription = Subscription.objects.get(owner=user)
         self.assertEqual(subscription.status, "inactive")
         self.assertFalse(subscription.has_access)

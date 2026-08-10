@@ -9,10 +9,10 @@ from .models import Subscription
 
 
 class PremiumAccessTests(TestCase):
-    def test_regular_owner_without_subscription_can_explore_dashboard(self):
+    def test_regular_owner_without_subscription_is_sent_to_billing(self):
         user = User.objects.create_user("free-owner", password="password")
         self.client.force_login(user)
-        self.assertEqual(self.client.get(reverse("dashboard")).status_code, 200)
+        self.assertRedirects(self.client.get(reverse("dashboard")), reverse("billing"))
 
     def test_expired_trial_owner_is_sent_to_billing_when_saving(self):
         user = User.objects.create_user("saving-owner", password="password")
@@ -21,14 +21,25 @@ class PremiumAccessTests(TestCase):
         response = self.client.post(reverse("customer-add"), {"name": "Blocked", "phone": "999"})
         self.assertRedirects(response, reverse("billing"))
 
-    def test_new_owner_gets_seven_day_trial_and_can_save(self):
-        user = User.objects.create_user("trial-owner", password="password")
+    def test_new_owner_requires_own_premium_before_saving(self):
+        user = User.objects.create_user("new-owner", email="new-owner@example.com", password="password")
         self.client.force_login(user)
-        response = self.client.post(reverse("customer-add"), {"name": "Trial Customer", "phone": "888"})
-        self.assertRedirects(response, reverse("customer-list"))
+        response = self.client.post(reverse("customer-add"), {"name": "Blocked Customer", "phone": "888"})
+        self.assertRedirects(response, reverse("billing"))
         subscription = Subscription.objects.get(owner=user)
-        self.assertTrue(subscription.is_trialing)
-        self.assertGreater(subscription.trial_end, timezone.now() + timedelta(days=6))
+        self.assertEqual(subscription.status, "inactive")
+        self.assertFalse(subscription.has_access)
+
+    def test_one_owners_payment_does_not_unlock_another_email(self):
+        paid = User.objects.create_user("paid", email="paid@example.com", password="password")
+        unpaid = User.objects.create_user("unpaid", email="unpaid@example.com", password="password")
+        Subscription.objects.create(owner=paid, status="active")
+        self.client.force_login(unpaid)
+
+        response = self.client.get(reverse("booking-list"))
+
+        self.assertRedirects(response, reverse("billing"))
+        self.assertFalse(Subscription.objects.get(owner=unpaid).has_access)
 
     def test_active_owner_can_open_dashboard(self):
         user = User.objects.create_user("premium-owner", password="password")

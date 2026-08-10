@@ -2,7 +2,6 @@ import base64
 import hashlib
 import hmac
 import json
-from datetime import datetime, timezone
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -13,7 +12,7 @@ class RazorpayError(Exception):
     pass
 
 
-def create_razorpay_subscription(owner, trial_end=None):
+def create_razorpay_subscription(owner):
     if not all((settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET, settings.RAZORPAY_PLAN_ID)):
         raise RazorpayError("Razorpay is not configured. Add the API key, secret and monthly plan ID.")
     subscription_data = {
@@ -23,8 +22,6 @@ def create_razorpay_subscription(owner, trial_end=None):
         "customer_notify": True,
         "notes": {"turfiq_owner_id": str(owner.pk), "email": owner.email},
     }
-    if trial_end and trial_end.timestamp() > datetime.now(tz=timezone.utc).timestamp() + 60:
-        subscription_data["start_at"] = int(trial_end.timestamp())
     payload = json.dumps(subscription_data).encode()
     token = base64.b64encode(f"{settings.RAZORPAY_KEY_ID}:{settings.RAZORPAY_KEY_SECRET}".encode()).decode()
     request = Request("https://api.razorpay.com/v1/subscriptions", data=payload, headers={"Authorization": f"Basic {token}", "Content-Type": "application/json"}, method="POST")

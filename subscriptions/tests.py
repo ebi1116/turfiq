@@ -76,6 +76,15 @@ class PremiumAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "199")
 
+    @override_settings(RAZORPAY_KEY_ID="rzp_test_public", RAZORPAY_KEY_SECRET="test-secret")
+    def test_billing_page_uses_standard_checkout_not_legacy_autopay(self):
+        user = User.objects.create_user("standard-billing-owner", password="password")
+        self.client.force_login(user)
+        response = self.client.get(reverse("billing"))
+        self.assertContains(response, 'id="razorpay-pay-button"')
+        self.assertNotContains(response, "Authorize &amp; Start Trial")
+        self.assertNotContains(response, "subscription_id")
+
     @override_settings(TEST_ACCOUNT_EMAIL="demo@turfiq.local")
     def test_configured_test_account_bypasses_premium_and_billing(self):
         user = User.objects.create_user("demo", "demo@turfiq.local", "password")

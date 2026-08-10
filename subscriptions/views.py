@@ -2,7 +2,6 @@ import json
 from datetime import timedelta
 
 from django.conf import settings
-from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import redirect, render
@@ -14,8 +13,8 @@ from .models import Subscription, WebhookEvent
 from .access import is_test_account
 from .services import (
     RazorpayAuthError, RazorpayError, create_razorpay_order,
-    create_razorpay_subscription, timestamp, verify_checkout_signature,
-    verify_order_signature, verify_webhook_signature,
+    timestamp, verify_checkout_signature, verify_order_signature,
+    verify_webhook_signature,
 )
 
 
@@ -24,24 +23,9 @@ def billing(request):
     if request.user.is_superuser or is_test_account(request.user):
         return redirect("dashboard")
     subscription, _ = Subscription.objects.get_or_create(owner=request.user)
-    checkout = None
-    if request.method == "POST":
-        try:
-            subscription.trial_start = timezone.now()
-            subscription.trial_end = subscription.trial_start + timedelta(days=7)
-            remote = create_razorpay_subscription(request.user, subscription.trial_end)
-            subscription.razorpay_subscription_id = remote["id"]
-            subscription.razorpay_plan_id = settings.RAZORPAY_PLAN_ID
-            subscription.status = remote.get("status", "created")
-            subscription.save()
-            checkout = {"key": settings.RAZORPAY_KEY_ID, "subscription_id": remote["id"], "name": "TurfIQ Analytics", "description": "7-day trial, then ₹199/month with autopay", "email": request.user.email, "contact": ""}
-        except RazorpayError as exc:
-            messages.error(request, str(exc))
     return render(request, "subscriptions/billing.html", {
         "subscription": subscription,
-        "checkout": checkout,
         "price": settings.PREMIUM_MONTHLY_PRICE,
-        "configured": all((settings.RAZORPAY_PLAN_ID, settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)),
         "standard_checkout_configured": all((settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)),
         "razorpay_key_id": settings.RAZORPAY_KEY_ID,
     })

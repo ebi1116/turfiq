@@ -4,6 +4,10 @@ from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from datetime import timedelta
+import hashlib
+import hmac
+import json
+from unittest.mock import patch
 
 from .models import Subscription
 
@@ -82,3 +86,62 @@ class PremiumAccessTests(TestCase):
 
         self.assertRedirects(response, reverse("customer-list"))
         self.assertRedirects(self.client.get(reverse("billing")), reverse("dashboard"))
+
+
+@override_settings(RAZORPAY_KEY_ID="rzp_test_public", RAZORPAY_KEY_SECRET="test-secret")
+class StandardCheckoutTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("checkout-owner", password="password")
+        self.client.force_login(self.user)
+
+    def test_create_order_rejects_amount_below_minimum(self):
+        response = self.client.post(
+            reverse("create-order"),
+            json.dumps({"amount": 99, "currency": "INR"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    @patch("subscriptions.views.create_razorpay_order")
+    def test_create_order_returns_checkout_fields_and_stores_pending_order(self, create):
+        create.return_value = {"id": "order_test", "amount": 19900, "currency": "INR"}
+        response = self.client.post(
+            reverse("create-order"),
+            json.dumps({"amount": 19900, "currency": "INR"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(response.content, {"order_id": "order_test", "amount": 19900, "currency": "INR"})
+        self.assertEqual(self.client.session["razorpay_pending_order"]["id"], "order_test")
+
+    def test_verify_payment_rejects_missing_fields(self):
+        response = self.client.post(reverse("verify-payment"), "{}", content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.json()["success"])
+
+    def test_verify_payment_rejects_signature_mismatch_without_activating(self):
+        session = self.client.session
+        session["razorpay_pending_order"] = {"id": "order_test", "amount": 19900, "currency": "INR"}
+        session.save()
+        response = self.client.post(
+            reverse("verify-payment"),
+            json.dumps({"razorpay_order_id": "order_test", "razorpay_payment_id": "pay_test", "razorpay_signature": "invalid"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Subscription.objects.filter(owner=self.user, status="active").exists())
+
+    def test_verify_payment_accepts_valid_signature_and_activates_premium(self):
+        session = self.client.session
+        session["razorpay_pending_order"] = {"id": "order_test", "amount": 19900, "currency": "INR"}
+        session.save()
+        signature = hmac.new(b"test-secret", b"order_test|pay_test", hashlib.sha256).hexdigest()
+        response = self.client.post(
+            reverse("verify-payment"),
+            json.dumps({"razorpay_order_id": "order_test", "razorpay_payment_id": "pay_test", "razorpay_signature": signature}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        subscription = Subscription.objects.get(owner=self.user)
+        self.assertEqual(subscription.status, "active")
+        self.assertEqual(subscription.razorpay_payment_id, "pay_test")

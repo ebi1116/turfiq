@@ -12,7 +12,11 @@ from django.views.decorators.http import require_POST
 
 from .models import Subscription, WebhookEvent
 from .access import is_test_account
-from .services import RazorpayError, create_razorpay_subscription, timestamp, verify_checkout_signature, verify_webhook_signature
+from .services import (
+    RazorpayAuthError, RazorpayError, create_razorpay_order,
+    create_razorpay_subscription, timestamp, verify_checkout_signature,
+    verify_order_signature, verify_webhook_signature,
+)
 
 
 @login_required
@@ -33,7 +37,71 @@ def billing(request):
             checkout = {"key": settings.RAZORPAY_KEY_ID, "subscription_id": remote["id"], "name": "TurfIQ Analytics", "description": "7-day trial, then ₹199/month with autopay", "email": request.user.email, "contact": ""}
         except RazorpayError as exc:
             messages.error(request, str(exc))
-    return render(request, "subscriptions/billing.html", {"subscription": subscription, "checkout": checkout, "price": settings.PREMIUM_MONTHLY_PRICE, "configured": all((settings.RAZORPAY_PLAN_ID, settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))})
+    return render(request, "subscriptions/billing.html", {
+        "subscription": subscription,
+        "checkout": checkout,
+        "price": settings.PREMIUM_MONTHLY_PRICE,
+        "configured": all((settings.RAZORPAY_PLAN_ID, settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)),
+        "standard_checkout_configured": all((settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)),
+        "razorpay_key_id": settings.RAZORPAY_KEY_ID,
+    })
+
+
+def _json_body(request):
+    try:
+        return json.loads(request.body or b"{}")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+
+@login_required
+@require_POST
+def create_order(request):
+    payload = _json_body(request)
+    if payload is None:
+        return JsonResponse({"error": "Invalid JSON body."}, status=400)
+    amount = payload.get("amount")
+    if isinstance(amount, bool) or not isinstance(amount, int) or amount < 100:
+        return JsonResponse({"error": "Amount must be an integer of at least 100 paise."}, status=400)
+    expected_amount = settings.PREMIUM_MONTHLY_PRICE * 100
+    if amount != expected_amount:
+        return JsonResponse({"error": f"Premium checkout amount must be {expected_amount} paise."}, status=400)
+    currency = str(payload.get("currency", "INR")).upper()
+    if currency != "INR":
+        return JsonResponse({"error": "Only INR is supported."}, status=400)
+    receipt = f"turfiq-{request.user.pk}-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+    try:
+        order = create_razorpay_order(amount, currency, receipt)
+    except RazorpayAuthError as exc:
+        return JsonResponse({"error": str(exc)}, status=401)
+    except RazorpayError:
+        return JsonResponse({"error": "Unable to create a Razorpay order. Please try again."}, status=500)
+    request.session["razorpay_pending_order"] = {
+        "id": order["id"], "amount": order["amount"], "currency": order["currency"],
+    }
+    return JsonResponse({"order_id": order["id"], "amount": order["amount"], "currency": order["currency"]})
+
+
+@login_required
+@require_POST
+def verify_payment(request):
+    payload = _json_body(request)
+    required = ("razorpay_payment_id", "razorpay_order_id", "razorpay_signature")
+    if payload is None or any(not payload.get(field) for field in required):
+        return JsonResponse({"success": False, "error": "Missing payment verification fields."}, status=400)
+    pending = request.session.get("razorpay_pending_order", {})
+    if payload["razorpay_order_id"] != pending.get("id"):
+        return JsonResponse({"success": False, "error": "Payment order does not match this checkout."}, status=400)
+    if not verify_order_signature(payload["razorpay_order_id"], payload["razorpay_payment_id"], payload["razorpay_signature"]):
+        return JsonResponse({"success": False, "error": "Invalid payment signature."}, status=400)
+    subscription, _ = Subscription.objects.get_or_create(owner=request.user)
+    subscription.razorpay_payment_id = payload["razorpay_payment_id"]
+    subscription.status = "active"
+    subscription.current_start = timezone.now()
+    subscription.current_end = subscription.current_start + timedelta(days=30)
+    subscription.save(update_fields=["razorpay_payment_id", "status", "current_start", "current_end", "updated_at"])
+    request.session.pop("razorpay_pending_order", None)
+    return JsonResponse({"success": True, "redirect": request.session.pop("premium_return_to", "/dashboard/")})
 
 
 @login_required

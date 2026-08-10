@@ -8,7 +8,7 @@ class PremiumAccessMiddleware:
     """Keep onboarding free, then require account-specific Premium features."""
 
     ALLOWED_PREFIXES = ("/admin/", "/billing/", "/accounts/", "/static/", "/media/")
-    FREE_ROUTE_NAMES = {"dashboard", "customer-list", "customer-add", "profile", "logout"}
+    FREE_ROUTE_NAMES = {"dashboard", "customer-list", "customer-add", "profile", "logout", "create-order", "verify-payment"}
 
     def __init__(self, get_response):
         self.get_response = get_response

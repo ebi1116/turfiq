@@ -9,10 +9,35 @@ from urllib.request import Request, urlopen
 
 from django.conf import settings
 import certifi
+import razorpay
+from razorpay.errors import BadRequestError, GatewayError, ServerError
 
 
 class RazorpayError(Exception):
     pass
+
+
+class RazorpayAuthError(RazorpayError):
+    pass
+
+
+def create_razorpay_order(amount, currency, receipt):
+    """Create a Standard Checkout order using server-side credentials."""
+    if not all((settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)):
+        raise RazorpayAuthError("Razorpay is not configured.")
+    client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+    try:
+        return client.order.create({"amount": amount, "currency": currency, "receipt": receipt})
+    except (BadRequestError, GatewayError, ServerError) as exc:
+        if "auth" in str(exc).casefold():
+            raise RazorpayAuthError("Razorpay authentication failed.") from exc
+        raise RazorpayError(str(exc) or "Razorpay rejected the order.") from exc
+
+
+def verify_order_signature(order_id, payment_id, signature):
+    message = f"{order_id}|{payment_id}".encode()
+    expected = hmac.new(settings.RAZORPAY_KEY_SECRET.encode(), message, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
 
 
 def create_razorpay_subscription(owner, trial_end):

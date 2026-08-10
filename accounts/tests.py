@@ -7,14 +7,23 @@ from .models import GoogleUserProfile
 from .services import sync_google_profile
 
 
-class GoogleOnlyAuthenticationTests(TestCase):
-    def test_login_page_has_only_google_authentication(self):
+class AuthenticationTests(TestCase):
+    def test_login_page_has_password_and_google_authentication(self):
         response = self.client.get(reverse("login"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Continue with Google")
+        self.assertContains(response, "Sign In")
+        self.assertContains(response, "Login with Google")
         self.assertContains(response, 'action="/accounts/google/login/"')
-        for forbidden in ("Forgot password", "Create account", 'type="password"', 'name="username"'):
-            self.assertNotContains(response, forbidden)
+        self.assertContains(response, 'type="password"')
+        self.assertContains(response, 'name="username"')
+
+    def test_owner_can_sign_in_with_email_and_password(self):
+        user = User.objects.create_user("demo", "demo@turfiq.local", "Demo@12345")
+
+        response = self.client.post(reverse("login"), {"username": user.email, "password": "Demo@12345"})
+
+        self.assertRedirects(response, reverse("dashboard"))
+        self.assertEqual(int(self.client.session["_auth_user_id"]), user.pk)
 
     def test_authenticated_owner_skips_entry_page(self):
         user = User.objects.create_user(username="existing-owner")

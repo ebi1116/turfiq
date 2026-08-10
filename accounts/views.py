@@ -1,15 +1,14 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import redirect
+from django.contrib.auth.views import LoginView
 from django.views.generic import TemplateView
 
+from .forms import EmailOrUsernameAuthenticationForm
 
-class GoogleLoginPageView(TemplateView):
+
+class SignInPageView(LoginView):
     template_name = "account/login.html"
-
-    def dispatch(self, request, *args, **kwargs):
-        if request.user.is_authenticated:
-            return redirect("dashboard")
-        return super().dispatch(request, *args, **kwargs)
+    authentication_form = EmailOrUsernameAuthenticationForm
+    redirect_authenticated_user = True
 
 
 class ProfileView(LoginRequiredMixin, TemplateView):

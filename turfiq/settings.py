@@ -127,6 +127,7 @@ RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
 RAZORPAY_PLAN_ID = os.getenv("RAZORPAY_PLAN_ID", "")
 RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
 PREMIUM_MONTHLY_PRICE = 199
+TEST_ACCOUNT_EMAIL = os.getenv("TEST_ACCOUNT_EMAIL", "")
 
 # Production security activates automatically when DJANGO_DEBUG=0.
 if not DEBUG:

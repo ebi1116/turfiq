@@ -1,6 +1,8 @@
 from django.shortcuts import redirect
 from django.urls import reverse
 
+from .access import is_test_account
+
 
 class PremiumAccessMiddleware:
     """Let owners explore TurfIQ, but require Premium for data changes."""
@@ -12,7 +14,8 @@ class PremiumAccessMiddleware:
 
     def __call__(self, request):
         user = request.user
-        if user.is_authenticated and not user.is_superuser:
+        request.is_test_account = is_test_account(user)
+        if user.is_authenticated and not user.is_superuser and not request.is_test_account:
             is_allowed = request.path.startswith(self.ALLOWED_PREFIXES)
             if request.path == reverse("logout"):
                 is_allowed = True

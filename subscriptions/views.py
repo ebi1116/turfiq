@@ -9,12 +9,13 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from .models import Subscription, WebhookEvent
+from .access import is_test_account
 from .services import RazorpayError, create_razorpay_subscription, timestamp, verify_checkout_signature, verify_webhook_signature
 
 
 @login_required
 def billing(request):
-    if request.user.is_superuser:
+    if request.user.is_superuser or is_test_account(request.user):
         return redirect("dashboard")
     subscription, _ = Subscription.objects.get_or_create(owner=request.user)
     checkout = None

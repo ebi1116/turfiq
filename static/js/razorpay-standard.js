@@ -44,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
         currency: order.currency,
         order_id: order.order_id,
         name: "TurfIQ Analytics",
-        description: "30 days of TurfIQ Premium",
+        description: button.dataset.description,
         theme: {color: "#0dbb75"},
         modal: {ondismiss: () => { showMessage("Payment cancelled.", true); button.disabled = false; }},
         handler: async (payment) => {
@@ -58,7 +58,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             const result = await readJson(verifyResponse);
             if (!verifyResponse.ok || !result.success) throw new Error(result.error || "Payment verification failed.");
-            showMessage("Payment verified. Premium is active.");
+            showMessage(button.dataset.successMessage);
             window.location.assign(result.redirect);
           } catch (error) {
             showMessage(error.message || "Payment verification failed.", true);

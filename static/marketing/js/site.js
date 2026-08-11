@@ -1,3 +1,4 @@
+const responsiveStyles=document.createElement("link"),siteScript=document.currentScript;responsiveStyles.rel="stylesheet";responsiveStyles.href=new URL("../css/responsive.css?v=1",siteScript.src).href;document.head.appendChild(responsiveStyles);
 document.addEventListener("DOMContentLoaded",()=>{
   let favicon=document.querySelector("link[rel~='icon']");
   if(!favicon){favicon=document.createElement("link");favicon.rel="icon";favicon.type="image/png";document.head.appendChild(favicon)}

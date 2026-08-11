@@ -7,7 +7,17 @@ document.addEventListener("DOMContentLoaded",()=>{
   const root=document.documentElement, saved=localStorage.getItem("turfiq-theme");
   if(saved) root.dataset.bsTheme=saved;
   document.getElementById("themeToggle")?.addEventListener("click",()=>{const next=root.dataset.bsTheme==="dark"?"light":"dark";root.dataset.bsTheme=next;localStorage.setItem("turfiq-theme",next);});
-  document.getElementById("menuToggle")?.addEventListener("click",()=>document.getElementById("sidebar")?.classList.toggle("open"));
+  const sidebar=document.getElementById("sidebar"),menuToggle=document.getElementById("menuToggle");
+  const sidebarBackdrop=document.createElement("button");
+  sidebarBackdrop.type="button";sidebarBackdrop.className="sidebar-backdrop";sidebarBackdrop.setAttribute("aria-label","Close navigation");
+  if(sidebar)sidebar.insertAdjacentElement("afterend",sidebarBackdrop);
+  const setSidebar=open=>{sidebar?.classList.toggle("open",open);sidebarBackdrop.classList.toggle("show",open);menuToggle?.setAttribute("aria-expanded",String(open));document.body.classList.toggle("nav-open",open)};
+  menuToggle?.setAttribute("aria-controls","sidebar");menuToggle?.setAttribute("aria-expanded","false");
+  menuToggle?.addEventListener("click",()=>setSidebar(!sidebar?.classList.contains("open")));
+  sidebarBackdrop.addEventListener("click",()=>setSidebar(false));
+  sidebar?.querySelectorAll("a").forEach(link=>link.addEventListener("click",()=>setSidebar(false)));
+  document.addEventListener("keydown",event=>{if(event.key==="Escape")setSidebar(false)});
+  window.addEventListener("resize",()=>{if(window.innerWidth>=992)setSidebar(false)});
   document.querySelectorAll(".counter").forEach(el=>{const target=parseFloat(el.dataset.value)||0,start=performance.now();const tick=now=>{const p=Math.min((now-start)/650,1);el.textContent=Math.round(target*(1-Math.pow(1-p,3))).toLocaleString();if(p<1)requestAnimationFrame(tick)};requestAnimationFrame(tick)});
   document.querySelectorAll(".progress-bar[data-width]").forEach(el=>requestAnimationFrame(()=>el.style.width=`${el.dataset.width}%`));
   document.querySelectorAll(".goal-ring").forEach(el=>el.style.setProperty("--progress",el.dataset.progress));

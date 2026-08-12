@@ -5,6 +5,7 @@ urlpatterns = [
     path("", MarketingPageView.as_view(template_name="marketing/home.html"), name="home"),
     path("about/", MarketingPageView.as_view(template_name="marketing/about.html"), name="about"),
     path("contact/", ContactView.as_view(), name="contact"),
+    path("contact/thank-you/", MarketingPageView.as_view(template_name="marketing/contact_thank_you.html"), name="contact-thank-you"),
     path("faq/", MarketingPageView.as_view(template_name="marketing/faq.html"), name="faq"),
     path("privacy/", MarketingPageView.as_view(template_name="marketing/privacy.html"), name="privacy"),
     path("terms/", MarketingPageView.as_view(template_name="marketing/terms.html"), name="terms"),

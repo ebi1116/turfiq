@@ -19,7 +19,7 @@ class MarketingSiteTests(TestCase):
 
     def test_contact_form_stores_message(self):
         response = self.client.post(reverse("contact"), {"name": "Owner", "email": "owner@example.com", "phone": "9876543210", "subject": "Analytics question", "message": "Please help with my dashboard."})
-        self.assertRedirects(response, reverse("contact"))
+        self.assertRedirects(response, reverse("contact-thank-you"))
         self.assertTrue(ContactMessage.objects.filter(email="owner@example.com").exists())
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["support@turfiq.in"])

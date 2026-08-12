@@ -15,7 +15,7 @@ class MarketingPageView(TemplateView):
 class ContactView(CreateView):
     form_class = ContactForm
     template_name = "marketing/contact.html"
-    success_url = reverse_lazy("contact")
+    success_url = reverse_lazy("contact-thank-you")
 
     def form_valid(self, form):
         response = super().form_valid(form)

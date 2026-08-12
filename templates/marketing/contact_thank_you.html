@@ -1,0 +1,16 @@
+{% extends 'marketing/base.html' %}
+{% block meta_title %}Message Received — TurfIQ{% endblock %}
+{% block meta_description %}Your message has been received by the TurfIQ support team.{% endblock %}
+{% block content %}
+<section class="inner-hero">
+  <div class="container narrow text-center">
+    <span class="kicker">MESSAGE RECEIVED</span>
+    <h1>Thank you for contacting TurfIQ.</h1>
+    <p>Your message has been sent to our support team. We’ll respond as soon as possible.</p>
+    <div class="d-flex justify-content-center gap-3 flex-wrap mt-4">
+      <a class="btn btn-brand" href="{% url 'home' %}">Return home</a>
+      <a class="btn btn-outline-secondary" href="mailto:support@turfiq.in">Email support</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

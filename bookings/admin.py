@@ -40,9 +40,13 @@ class CustomerAdmin(OwnerScopedAdminMixin, admin.ModelAdmin):
 class BookingAdmin(OwnerScopedAdminMixin, admin.ModelAdmin):
     list_display = ("customer", "booking_date", "booking_time", "sport", "amount", "status")
     list_filter = ("status", "sport", "payment_method")
-    search_fields = ("customer__name", "customer__phone", "ground")
+    search_fields = ("customer__name", "customer__phone", "ground__name")
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "customer" and not request.user.is_superuser:
-            kwargs["queryset"] = Customer.objects.filter(owner=request.user).order_by("name")
+        if not request.user.is_superuser:
+            if db_field.name == "customer":
+                kwargs["queryset"] = Customer.objects.filter(owner=request.user).order_by("name")
+            elif db_field.name == "ground":
+                from business.models import Ground
+                kwargs["queryset"] = Ground.objects.filter(owner=request.user, is_active=True)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)

@@ -3,6 +3,8 @@ from django.contrib.auth.views import LoginView
 from django.views.generic import TemplateView
 
 from .forms import EmailOrUsernameAuthenticationForm
+from business.views import SettingsView
+from django.urls import reverse_lazy
 
 
 class SignInPageView(LoginView):
@@ -11,5 +13,6 @@ class SignInPageView(LoginView):
     redirect_authenticated_user = True
 
 
-class ProfileView(LoginRequiredMixin, TemplateView):
+class ProfileView(SettingsView):
     template_name = "accounts/profile.html"
+    success_url = reverse_lazy("profile")

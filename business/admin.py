@@ -3,7 +3,9 @@ from django.db.models import Count
 
 from bookings.models import Customer
 from expenses.models import Expense
-from .models import BusinessSettings, TurfOwnerWorkspace
+from .models import BusinessSettings, Ground, TurfOwnerWorkspace
+
+admin.site.register(Ground)
 
 
 @admin.register(BusinessSettings)

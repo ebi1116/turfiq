@@ -1,4 +1,6 @@
 from django.contrib import messages
+from django.conf import settings
+from django.core.mail import EmailMessage
 from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, TemplateView
@@ -16,8 +18,30 @@ class ContactView(CreateView):
     success_url = reverse_lazy("contact")
 
     def form_valid(self, form):
+        response = super().form_valid(form)
+        enquiry = self.object
+        email = EmailMessage(
+            subject=f"TurfIQ enquiry: {enquiry.subject}",
+            body=(
+                f"Name: {enquiry.name}\n"
+                f"Email: {enquiry.email}\n"
+                f"Phone: {enquiry.phone or 'Not provided'}\n\n"
+                f"Message:\n{enquiry.message}"
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[settings.SUPPORT_EMAIL],
+            reply_to=[enquiry.email],
+        )
+        try:
+            email.send(fail_silently=False)
+        except Exception:
+            messages.warning(
+                self.request,
+                "Your message was saved, but email delivery is temporarily unavailable. You can email support@turfiq.in directly.",
+            )
+            return response
         messages.success(self.request, "Thanks for contacting TurfIQ. Our team will respond shortly.")
-        return super().form_valid(form)
+        return response
 
 
 def robots_txt(request):

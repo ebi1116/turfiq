@@ -1,4 +1,5 @@
 from django.test import TestCase
+from django.core import mail
 from django.urls import reverse
 
 from .models import ContactMessage
@@ -20,6 +21,9 @@ class MarketingSiteTests(TestCase):
         response = self.client.post(reverse("contact"), {"name": "Owner", "email": "owner@example.com", "phone": "9876543210", "subject": "Analytics question", "message": "Please help with my dashboard."})
         self.assertRedirects(response, reverse("contact"))
         self.assertTrue(ContactMessage.objects.filter(email="owner@example.com").exists())
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["support@turfiq.in"])
+        self.assertEqual(mail.outbox[0].reply_to, ["owner@example.com"])
 
     def test_search_discovery_files(self):
         self.assertContains(self.client.get(reverse("robots-txt")), "Sitemap:")

@@ -1,6 +1,22 @@
+from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
+from django.urls import reverse
 
 from .services import sync_google_profile
+
+
+def role_login_redirect_url(user):
+    """Return the landing page for this authenticated user only."""
+    if user.is_superuser or user.is_staff:
+        return reverse("admin:index")
+    return reverse("dashboard")
+
+
+class TurfIQAccountAdapter(DefaultAccountAdapter):
+    """Apply the same role-based landing page to allauth/Google logins."""
+
+    def get_login_redirect_url(self, request):
+        return role_login_redirect_url(request.user)
 
 
 class GoogleOnlySocialAccountAdapter(DefaultSocialAccountAdapter):

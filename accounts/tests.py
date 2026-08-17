@@ -1,6 +1,6 @@
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 
 from .models import GoogleUserProfile
@@ -30,6 +30,34 @@ class AuthenticationTests(TestCase):
         self.client.force_login(user)
         self.assertRedirects(self.client.get(reverse("login")), "/dashboard/")
         self.assertEqual(reverse("dashboard"), "/dashboard/")
+
+    def test_superuser_and_owner_sessions_are_independent(self):
+        admin = User.objects.create_superuser("admin", "admin@example.com", "AdminPass123!")
+        owner = User.objects.create_user("owner-two", "owner@example.com", "OwnerPass123!")
+        admin_client = Client()
+        owner_client = Client()
+
+        admin_response = admin_client.post(
+            reverse("login"), {"username": admin.username, "password": "AdminPass123!"}
+        )
+        owner_response = owner_client.post(
+            reverse("login"), {"username": owner.username, "password": "OwnerPass123!"}
+        )
+
+        self.assertRedirects(admin_response, reverse("admin:index"))
+        self.assertRedirects(owner_response, reverse("dashboard"))
+        self.assertEqual(int(admin_client.session["_auth_user_id"]), admin.pk)
+        self.assertEqual(int(owner_client.session["_auth_user_id"]), owner.pk)
+        self.assertNotEqual(admin_client.session.session_key, owner_client.session.session_key)
+
+        admin_client.post(reverse("logout"))
+        self.assertNotIn("_auth_user_id", admin_client.session)
+        self.assertEqual(int(owner_client.session["_auth_user_id"]), owner.pk)
+
+        admin_client.force_login(admin)
+        owner_client.post(reverse("logout"))
+        self.assertNotIn("_auth_user_id", owner_client.session)
+        self.assertEqual(int(admin_client.session["_auth_user_id"]), admin.pk)
 
     def test_legacy_authentication_routes_are_removed(self):
         for path in (

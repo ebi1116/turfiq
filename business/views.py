@@ -27,6 +27,12 @@ class SettingsView(LoginRequiredMixin, UpdateView):
             else:
                 ground = Ground(owner=self.request.user, turf=self.object, number=number)
             ground.name = self.request.POST.get(f"ground_name_{number}", "").strip()
+            ground.use_custom_hours = self.request.POST.get(f"ground_custom_hours_{number}") == "on"
+            ground.is_24_hours = self.request.POST.get(f"ground_24_hours_{number}") == "on"
+            from datetime import datetime
+            for field in ("opening_time", "closing_time"):
+                raw = self.request.POST.get(f"ground_{field}_{number}", "")
+                setattr(ground, field, datetime.strptime(raw, "%H:%M").time() if raw else None)
             ground.save()
         for number, ground in existing.items():
             if number > desired:

@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Sum
+import uuid
 
 class Tournament(models.Model):
     SPORTS=[(x,x) for x in ("Football","Cricket","Futsal","Volleyball","Custom")]
@@ -16,9 +17,14 @@ class Tournament(models.Model):
     prize_1=models.DecimalField(max_digits=12,decimal_places=2,default=0); prize_2=models.DecimalField(max_digits=12,decimal_places=2,default=0); prize_3=models.DecimalField(max_digits=12,decimal_places=2,default=0)
     organizer=models.CharField(max_length=120); contact=models.CharField(max_length=20); rules=models.TextField(blank=True)
     status=models.CharField(max_length=25,choices=STATUSES,default="Draft",db_index=True); format=models.CharField(max_length=10,choices=FORMATS,default="single")
+    registration_token=models.UUIDField(default=uuid.uuid4,unique=True,editable=False)
     created_at=models.DateTimeField(auto_now_add=True); updated_at=models.DateTimeField(auto_now=True)
     class Meta: ordering=["-start_date","name"]
     def __str__(self): return self.name
+    @property
+    def registration_is_open(self):
+        from django.utils import timezone
+        return self.status == "Registration Open" and self.registration_deadline >= timezone.localdate() and self.teams.count() < self.max_teams
     @property
     def expected_collection(self): return self.entry_fee*self.teams.count()
     @property

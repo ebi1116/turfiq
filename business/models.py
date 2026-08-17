@@ -25,6 +25,10 @@ class Ground(models.Model):
     number = models.PositiveIntegerField()
     name = models.CharField(max_length=120, blank=True)
     is_active = models.BooleanField(default=True, db_index=True)
+    use_custom_hours = models.BooleanField(default=False)
+    is_24_hours = models.BooleanField(default=False)
+    opening_time = models.TimeField(null=True, blank=True)
+    closing_time = models.TimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

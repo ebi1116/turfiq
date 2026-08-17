@@ -1,6 +1,8 @@
 import random
 from django.db import transaction
 from .models import Match,Standing
+from .models import Tournament, Team
+from django.core.exceptions import ValidationError
 
 @transaction.atomic
 def generate_fixtures(tournament,mode="random"):
@@ -37,3 +39,20 @@ def rebuild_standings(tournament):
         elif m.score_b>m.score_a:b.won+=1;b.points+=3;a.lost+=1
         else:a.drawn+=1;b.drawn+=1;a.points+=1;b.points+=1
     Standing.objects.bulk_create(rows.values()); return rows.values()
+
+@transaction.atomic
+def register_team(tournament, cleaned_data):
+    locked = Tournament.objects.select_for_update().get(pk=tournament.pk)
+    if not locked.registration_is_open:
+        if locked.teams.count() >= locked.max_teams and locked.status == "Registration Open":
+            locked.status = "Registration Closed"
+            locked.save(update_fields=("status", "updated_at"))
+        raise ValidationError("Registration is closed for this tournament.")
+    cleaned_data.pop("consent", None)
+    if locked.teams.filter(name__iexact=cleaned_data["name"].strip()).exists():
+        raise ValidationError("A team with this name is already registered.")
+    team = Team.objects.create(tournament=locked, **cleaned_data)
+    if locked.teams.count() >= locked.max_teams:
+        locked.status = "Registration Closed"
+        locked.save(update_fields=("status", "updated_at"))
+    return team

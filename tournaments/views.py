@@ -7,12 +7,14 @@ from django.db.models import Count,Sum,Max
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404,redirect,render
 from django.utils import timezone
+from django.urls import reverse
 from openpyxl import Workbook
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from .forms import *
 from .models import *
-from .services import generate_fixtures,rebuild_standings
+from .services import generate_fixtures,rebuild_standings,register_team
+from django.core.exceptions import ValidationError
 
 def owned(request,pk): return get_object_or_404(Tournament,pk=pk,owner=request.user)
 @login_required
@@ -31,7 +33,11 @@ def dashboard(request):
 @login_required
 def tournament_form(request,pk=None):
     obj=owned(request,pk) if pk else None; form=TournamentForm(request.POST or None,request.FILES or None,instance=obj)
-    if form.is_valid(): item=form.save(commit=False);item.owner=request.user;item.save();messages.success(request,"Tournament saved.");return redirect("tournaments:detail",pk=item.pk)
+    if form.is_valid():
+        item=form.save(commit=False);item.owner=request.user;item.save()
+        registration_url=request.build_absolute_uri(reverse("tournaments:public-registration",args=[item.registration_token]))
+        messages.success(request,f"Tournament saved. Public registration form: {registration_url}")
+        return redirect("tournaments:detail",pk=item.pk)
     return render(request,"tournaments/form.html",{"form":form,"object":obj,"title":"Edit tournament" if obj else "Create tournament"})
 @login_required
 def detail(request,pk):
@@ -49,6 +55,19 @@ def team_form(request,pk):
         if t.teams.count()>=t.max_teams: form.add_error(None,"Maximum team capacity reached.")
         else:item=form.save(commit=False);item.tournament=t;item.save();messages.success(request,f"Team registered as {item.team_id}.");return redirect("tournaments:detail",pk=pk)
     return render(request,"tournaments/form.html",{"form":form,"title":"Register team","object":t})
+
+def public_registration(request, token):
+    t=get_object_or_404(Tournament,registration_token=token)
+    form=PublicTeamRegistrationForm(request.POST or None)
+    registered_team=None
+    if request.method == "POST" and form.is_valid():
+        try:
+            registered_team=register_team(t,form.cleaned_data.copy())
+            t.refresh_from_db()
+            form=PublicTeamRegistrationForm()
+        except ValidationError as error:
+            form.add_error(None,error.message)
+    return render(request,"tournaments/public_registration.html",{"tournament":t,"form":form,"registered_team":registered_team})
 @login_required
 def payment_form(request,pk,team_pk):
     t=owned(request,pk);team=get_object_or_404(t.teams,pk=team_pk);form=PaymentForm(request.POST or None)

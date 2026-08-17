@@ -1,8 +1,10 @@
-from datetime import date, time
+from datetime import date, time, datetime, timedelta
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
-from bookings.models import Booking, Customer
+from bookings.models import Booking, Customer, BlockedSlot
+from dashboard.services import get_daily_booking_analytics
+from django.utils import timezone
 from subscriptions.models import Subscription
 from business.models import BusinessSettings, Ground
 
@@ -45,3 +47,38 @@ class DashboardTests(TestCase):
         other_turf = BusinessSettings.objects.create(owner=other)
         other_ground = Ground.objects.create(owner=other, turf=other_turf, number=1)
         self.assertEqual(self.client.get(reverse("ground-analytics", args=[other_ground.pk])).status_code, 404)
+
+    def test_daily_analytics_uses_booking_intervals(self):
+        ground = Ground.objects.get(owner=self.user)
+        turf = ground.turf
+        turf.opening_time, turf.closing_time = time(8), time(20)
+        turf.save(update_fields=("opening_time", "closing_time"))
+        booking = Booking.objects.get(owner=self.user)
+        booking.booking_time, booking.duration = time(10), 2
+        booking.save(update_fields=("booking_time", "duration"))
+        result = get_daily_booking_analytics(date.today(), ground, now=timezone.make_aware(datetime.combine(date.today(), time(7))))
+        self.assertEqual(len(result["slots"]), 12)
+        self.assertEqual(result["booked_hours"], 2)
+        self.assertEqual([s["status"] for s in result["slots"]][2:5], ["BOOKED", "BOOKED", "AVAILABLE"])
+
+    def test_24_hour_and_overnight_operating_hours(self):
+        ground = Ground.objects.get(owner=self.user)
+        ground.use_custom_hours, ground.is_24_hours = True, True
+        ground.save()
+        self.assertEqual(len(get_daily_booking_analytics(date.today() + timedelta(days=1), ground)["slots"]), 24)
+        ground.is_24_hours, ground.opening_time, ground.closing_time = False, time(18), time(6)
+        ground.save()
+        result = get_daily_booking_analytics(date.today() + timedelta(days=1), ground)
+        self.assertEqual(len(result["slots"]), 12)
+        self.assertNotEqual(result["slots"][5]["start_time"][:10], result["slots"][6]["start_time"][:10])
+
+    def test_blocked_slots_and_api(self):
+        ground = Ground.objects.get(owner=self.user)
+        selected = date.today() + timedelta(days=1)
+        start = timezone.make_aware(datetime.combine(selected, time(7)))
+        BlockedSlot.objects.create(owner=self.user, ground=ground, start_at=start, end_at=start + timedelta(hours=1))
+        result = get_daily_booking_analytics(selected, ground)
+        self.assertEqual(next(s for s in result["slots"] if s["start_label"] == "07:00 AM")["status"], "BLOCKED")
+        response = self.client.get(reverse("daily-booking-analytics-api", args=[ground.pk]), {"date": selected.isoformat()})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("slots", response.json())

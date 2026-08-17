@@ -23,3 +23,21 @@ class TournamentTests(TestCase):
     def test_owner_isolation_and_dashboard(self):
         self.client.login(username="other",password="pass");self.assertEqual(self.client.get(reverse("tournaments:detail",args=[self.t.pk])).status_code,404)
         self.client.login(username="owner",password="pass");response=self.client.get(reverse("tournaments:dashboard"));self.assertContains(response,"Champions Cup")
+
+    def test_public_registration_closes_at_team_capacity(self):
+        self.t.status="Registration Open";self.t.save(update_fields=["status"])
+        url=reverse("tournaments:public-registration",args=[self.t.registration_token])
+        self.assertContains(self.client.get(url),"Team details")
+        for number in range(4,8):
+            response=self.client.post(url,{"name":f"Public Team {number}","captain":"Captain","captain_mobile":f"90000000{number}","alternate_mobile":"","district":"Kochi","players":7,"jersey_color":"Green","consent":"on"})
+            self.assertEqual(response.status_code,200)
+        self.t.refresh_from_db()
+        self.assertEqual(self.t.teams.count(),8)
+        self.assertEqual(self.t.status,"Registration Closed")
+        self.assertContains(self.client.get(url),"Registration Closed")
+
+    def test_public_registration_rejects_duplicate_team_name(self):
+        self.t.status="Registration Open";self.t.save(update_fields=["status"])
+        response=self.client.post(reverse("tournaments:public-registration",args=[self.t.registration_token]),{"name":"Team 0","captain":"Other","captain_mobile":"999","alternate_mobile":"","district":"Kochi","players":7,"jersey_color":"Blue","consent":"on"})
+        self.assertContains(response,"already registered")
+        self.assertEqual(self.t.teams.count(),4)

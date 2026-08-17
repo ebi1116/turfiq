@@ -13,6 +13,7 @@ class SignInPageView(LoginView):
     redirect_authenticated_user = True
 
 
+
 class ProfileView(SettingsView):
     template_name = "accounts/profile.html"
     success_url = reverse_lazy("profile")

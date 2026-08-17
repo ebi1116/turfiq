@@ -17,6 +17,9 @@ class TournamentForm(StyledForm):
         return d
 class TeamForm(StyledForm):
     class Meta: model=Team; exclude=("tournament","team_id","payment_status")
+
+class PublicTeamRegistrationForm(TeamForm):
+    consent=forms.BooleanField(label="I confirm that the details entered are correct")
 class PaymentForm(StyledForm):
     class Meta: model=Payment; exclude=("team",); widgets={"date":forms.DateInput(attrs={"type":"date"})}
 class MatchForm(StyledForm):

@@ -13,7 +13,7 @@ python manage.py seed_demo
 python manage.py runserver
 ```
 
-Open `http://127.0.0.1:8000/accounts/login/` and continue with Google. TurfIQ has no public username, password, registration, recovery, or OTP flow.
+Open `http://127.0.0.1:8000/accounts/login/`. Sign in to the seeded full-access workspace with `demo` / `Demo@12345`, or continue with Google. The demo credentials can be overridden with `DEMO_LOGIN_USERNAME` and `DEMO_LOGIN_PASSWORD`.
 
 ## Google OAuth setup
 

@@ -4,11 +4,97 @@ from decimal import Decimal
 from django.db.models import Count, Sum
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
-from bookings.models import Booking
+from bookings.models import Booking, BlockedSlot
 from expenses.models import Expense
 from business.models import BusinessSettings, Ground
 
 ZERO = Decimal("0")
+
+
+def _merge_intervals(intervals):
+    merged = []
+    for start, end in sorted(intervals):
+        if not merged or start > merged[-1][1]:
+            merged.append([start, end])
+        else:
+            merged[-1][1] = max(merged[-1][1], end)
+    return merged
+
+
+def get_daily_booking_analytics(selected_date, ground, now=None):
+    """Return timezone-aware availability for one ground's operating day."""
+    settings = ground.turf
+    try:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(settings.timezone)
+    except Exception:
+        tz = timezone.get_current_timezone()
+    opening = ground.opening_time if ground.use_custom_hours and ground.opening_time else settings.opening_time
+    closing = ground.closing_time if ground.use_custom_hours and ground.closing_time else settings.closing_time
+    is_24_hours = ground.is_24_hours or opening == closing
+    start = datetime.combine(selected_date, time.min if is_24_hours else opening, tzinfo=tz)
+    end = start + timedelta(days=1) if is_24_hours else datetime.combine(selected_date, closing, tzinfo=tz)
+    if end <= start:
+        end += timedelta(days=1)
+    now = now or timezone.now().astimezone(tz)
+
+    candidates = Booking.objects.filter(
+        owner=ground.owner, ground=ground,
+        booking_date__range=(selected_date - timedelta(days=1), selected_date + timedelta(days=1)),
+    ).exclude(status="Cancelled").select_related("customer")
+    bookings = []
+    for booking in candidates:
+        booking_start = datetime.combine(booking.booking_date, booking.booking_time, tzinfo=tz)
+        booking_end = booking_start + timedelta(hours=float(booking.duration))
+        if booking_start < end and booking_end > start:
+            bookings.append((booking, booking_start, booking_end))
+    blocks = list(BlockedSlot.objects.filter(owner=ground.owner, ground=ground, start_at__lt=end, end_at__gt=start))
+
+    slots = []
+    cursor = start
+    while cursor < end:
+        slot_end = min(cursor + timedelta(hours=1), end)
+        matches = [(b, bs, be) for b, bs, be in bookings if bs < slot_end and be > cursor]
+        blocked = any(block.start_at.astimezone(tz) < slot_end and block.end_at.astimezone(tz) > cursor for block in blocks)
+        if matches:
+            status = "IN_PROGRESS" if cursor <= now < slot_end else "BOOKED"
+        elif blocked:
+            status = "BLOCKED"
+        elif selected_date < now.date() or slot_end <= now:
+            status = "PAST"
+        else:
+            status = "AVAILABLE"
+        slots.append({
+            "start_time": cursor.isoformat(), "end_time": slot_end.isoformat(), "status": status,
+            "booking_id": matches[0][0].pk if matches else None,
+            "start_label": cursor.strftime("%I:%M %p"), "end_label": slot_end.strftime("%I:%M %p"),
+            "status_label": status.replace("_", " ").title(),
+        })
+        cursor = slot_end
+
+    clipped = [(max(bs, start), min(be, end)) for _, bs, be in bookings]
+    booked_seconds = sum((b - a).total_seconds() for a, b in _merge_intervals(clipped))
+    blocked_intervals = [
+        (max(block.start_at.astimezone(tz), start), min(block.end_at.astimezone(tz), end)) for block in blocks
+    ]
+    unavailable_seconds = sum((b - a).total_seconds() for a, b in _merge_intervals(clipped + blocked_intervals))
+    operating_hours = (end - start).total_seconds() / 3600
+    booked_hours = booked_seconds / 3600
+    available_slots = sum(slot["status"] == "AVAILABLE" for slot in slots)
+    revenue = sum((booking.amount for booking, _, _ in bookings), ZERO)
+    return {
+        "date": selected_date.isoformat(),
+        "date_label": selected_date.strftime("%A, %B %d"),
+        "operating_hours": {"start": start.isoformat(), "end": end.isoformat(), "label": "24 Hours" if is_24_hours else f"{start:%I:%M %p} – {end:%I:%M %p}"},
+        "total_operating_hours": round(operating_hours, 2), "total_bookings": len(bookings),
+        "booked_hours": round(booked_hours, 2), "available_hours": round(max(operating_hours - unavailable_seconds / 3600, 0), 2),
+        "total_available_slots": available_slots, "occupancy_percentage": round(booked_hours / operating_hours * 100, 1) if operating_hours else 0,
+        "revenue": revenue, "slots": slots,
+        "status_counts": {status: sum(slot["status"] == status for slot in slots) for status in ("AVAILABLE", "BOOKED", "IN_PROGRESS", "PAST", "BLOCKED")},
+    }
+
+
+getDailyBookingAnalytics = get_daily_booking_analytics
 def pct(current, previous):
     return round(float((current - previous) / previous * 100), 1) if previous else (100.0 if current else 0.0)
 def total(qs): return qs.aggregate(v=Sum("amount"))["v"] or ZERO

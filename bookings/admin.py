@@ -2,7 +2,20 @@ from django.contrib import admin
 from django.db import models
 from turfiq.admin_mixins import OwnerScopedAdminMixin
 
-from .models import Booking, Customer
+from .models import Booking, Customer, BlockedSlot
+
+
+@admin.register(BlockedSlot)
+class BlockedSlotAdmin(OwnerScopedAdminMixin, admin.ModelAdmin):
+    list_display = ("ground", "start_at", "end_at", "reason")
+    list_filter = ("ground",)
+    search_fields = ("ground__name", "reason")
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "ground" and not request.user.is_superuser:
+            from business.models import Ground
+            kwargs["queryset"] = Ground.objects.filter(owner=request.user, is_active=True)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 @admin.register(Customer)

@@ -42,7 +42,8 @@ def tournament_form(request,pk=None):
 @login_required
 def detail(request,pk):
     t=owned(request,pk); standings=list(t.standings.select_related("team"));standings.sort(key=lambda x:(x.points,x.goal_difference,x.goals_for),reverse=True)
-    return render(request,"tournaments/detail.html",{"tournament":t,"standings":standings,"due_reminders":t.reminders.filter(is_done=False,due_at__lte=timezone.now()+timedelta(days=7)),"income_chart":[float(t.entry_collection),float(t.incomes.aggregate(v=Sum("amount"))["v"] or 0),float(t.total_expenses)]})
+    registration_url=request.build_absolute_uri(reverse("tournaments:public-registration",args=[t.registration_token]))
+    return render(request,"tournaments/detail.html",{"tournament":t,"registration_url":registration_url,"standings":standings,"due_reminders":t.reminders.filter(is_done=False,due_at__lte=timezone.now()+timedelta(days=7)),"income_chart":[float(t.entry_collection),float(t.incomes.aggregate(v=Sum("amount"))["v"] or 0),float(t.total_expenses)]})
 @login_required
 def delete(request,pk):
     t=owned(request,pk)

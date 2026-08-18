@@ -24,6 +24,14 @@ class TournamentTests(TestCase):
         self.client.login(username="other",password="pass");self.assertEqual(self.client.get(reverse("tournaments:detail",args=[self.t.pk])).status_code,404)
         self.client.login(username="owner",password="pass");response=self.client.get(reverse("tournaments:dashboard"));self.assertContains(response,"Champions Cup")
 
+    def test_detail_displays_public_registration_link(self):
+        self.owner.is_superuser=True;self.owner.save(update_fields=["is_superuser"])
+        self.client.login(username="owner",password="pass")
+        response=self.client.get(reverse("tournaments:detail",args=[self.t.pk]),secure=True)
+        registration_path=reverse("tournaments:public-registration",args=[self.t.registration_token])
+        self.assertContains(response,">Link</a>")
+        self.assertContains(response,registration_path)
+
     def test_public_registration_closes_at_team_capacity(self):
         self.t.status="Registration Open";self.t.save(update_fields=["status"])
         url=reverse("tournaments:public-registration",args=[self.t.registration_token])

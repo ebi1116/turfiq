@@ -1,12 +1,18 @@
 from pathlib import Path
 import os
+import dj_database_url
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-turfiq-key-change-this-before-production-9x7v5n3m1q")
-IS_RENDER = bool(os.getenv("RENDER"))
-DEBUG = os.getenv("DJANGO_DEBUG", "0" if IS_RENDER else "1") == "1"
+IS_RENDER = bool(os.environ.get("RENDER"))
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY and not IS_RENDER:
+    SECRET_KEY = os.environ.get(
+        "DJANGO_SECRET_KEY",
+        "dev-only-turfiq-key-change-this-before-production-9x7v5n3m1q",
+    )
+DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 
 def env_list(name, default=""):
@@ -51,13 +57,11 @@ TEMPLATES = [{
 }]
 WSGI_APPLICATION = "turfiq.wsgi.application"
 
-if os.getenv("DATABASE_URL"):
-    from urllib.parse import urlparse
-    db = urlparse(os.environ["DATABASE_URL"])
-    DATABASES = {"default": {"ENGINE": "django.db.backends.postgresql", "NAME": db.path.lstrip("/"),
-        "USER": db.username, "PASSWORD": db.password, "HOST": db.hostname, "PORT": db.port}}
-else:
-    DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}}
+DATABASES = {
+    "default": dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+    )
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -143,7 +147,7 @@ TEST_ACCOUNT_EMAIL = os.getenv("TEST_ACCOUNT_EMAIL", "")
 DEMO_LOGIN_USERNAME = os.getenv("DEMO_LOGIN_USERNAME", "demo")
 DEMO_LOGIN_PASSWORD = os.getenv("DEMO_LOGIN_PASSWORD", "Demo@12345")
 
-# Production security activates automatically when DJANGO_DEBUG=0.
+# Production security activates automatically when DEBUG=False.
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True

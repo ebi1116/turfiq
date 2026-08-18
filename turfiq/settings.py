@@ -12,7 +12,9 @@ if not SECRET_KEY and not IS_RENDER:
         "DJANGO_SECRET_KEY",
         "dev-only-turfiq-key-change-this-before-production-9x7v5n3m1q",
     )
-DEBUG = os.environ.get("DEBUG", "False") == "True"
+DEBUG = os.getenv("DJANGO_DEBUG", os.getenv("DEBUG", "0")).strip().lower() in {
+    "1", "true", "yes", "on",
+}
 
 
 def env_list(name, default=""):
@@ -25,6 +27,10 @@ if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", "https://turfiq.in,https://www.turfiq.in")
+if DEBUG:
+    for local_origin in ("https://127.0.0.1:8000", "https://localhost:8000"):
+        if local_origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(local_origin)
 if RENDER_EXTERNAL_HOSTNAME:
     render_origin = f"https://{RENDER_EXTERNAL_HOSTNAME}"
     if render_origin not in CSRF_TRUSTED_ORIGINS:
@@ -38,6 +44,8 @@ INSTALLED_APPS = [
     "allauth.socialaccount.providers.google", "crispy_forms", "crispy_bootstrap5",
     "accounts.apps.AccountsConfig", "business", "bookings", "expenses", "dashboard", "reports", "subscriptions", "marketing", "tournaments",
 ]
+if DEBUG:
+    INSTALLED_APPS.append("django_extensions")
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware", "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -147,7 +155,12 @@ TEST_ACCOUNT_EMAIL = os.getenv("TEST_ACCOUNT_EMAIL", "")
 DEMO_LOGIN_USERNAME = os.getenv("DEMO_LOGIN_USERNAME", "demo")
 DEMO_LOGIN_PASSWORD = os.getenv("DEMO_LOGIN_PASSWORD", "Demo@12345")
 
-# Production security activates automatically when DEBUG=False.
+# Safe defaults for local development. Render and other production deployments
+# retain HTTPS enforcement whenever DEBUG is disabled.
+SECURE_SSL_REDIRECT = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+SECURE_HSTS_SECONDS = 0
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True

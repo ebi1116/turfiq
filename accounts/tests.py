@@ -8,22 +8,14 @@ from .services import sync_google_profile
 
 
 class AuthenticationTests(TestCase):
-    def test_login_page_has_password_and_google_authentication(self):
+    def test_login_page_only_has_google_authentication(self):
         response = self.client.get(reverse("login"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Sign In")
-        self.assertContains(response, "Login with Google")
+        self.assertContains(response, "Continue with Google")
         self.assertContains(response, 'action="/accounts/google/login/"')
-        self.assertContains(response, 'type="password"')
-        self.assertContains(response, 'name="username"')
-
-    def test_owner_can_sign_in_with_email_and_password(self):
-        user = User.objects.create_user("demo", "demo@turfiq.local", "Demo@12345")
-
-        response = self.client.post(reverse("login"), {"username": user.email, "password": "Demo@12345"})
-
-        self.assertRedirects(response, reverse("dashboard"))
-        self.assertEqual(int(self.client.session["_auth_user_id"]), user.pk)
+        self.assertNotContains(response, 'type="password"')
+        self.assertNotContains(response, 'name="username"')
+        self.assertEqual(self.client.post(reverse("login"), {}).status_code, 405)
 
     def test_authenticated_owner_skips_entry_page(self):
         user = User.objects.create_user(username="existing-owner")
@@ -37,15 +29,11 @@ class AuthenticationTests(TestCase):
         admin_client = Client()
         owner_client = Client()
 
-        admin_response = admin_client.post(
-            reverse("login"), {"username": admin.username, "password": "AdminPass123!"}
-        )
-        owner_response = owner_client.post(
-            reverse("login"), {"username": owner.username, "password": "OwnerPass123!"}
-        )
+        admin_client.force_login(admin)
+        owner_client.force_login(owner)
 
-        self.assertRedirects(admin_response, reverse("admin:index"))
-        self.assertRedirects(owner_response, reverse("dashboard"))
+        self.assertRedirects(admin_client.get(reverse("login")), reverse("admin:index"))
+        self.assertRedirects(owner_client.get(reverse("login")), reverse("dashboard"))
         self.assertEqual(int(admin_client.session["_auth_user_id"]), admin.pk)
         self.assertEqual(int(owner_client.session["_auth_user_id"]), owner.pk)
         self.assertNotEqual(admin_client.session.session_key, owner_client.session.session_key)

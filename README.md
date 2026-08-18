@@ -29,6 +29,22 @@ Open `http://127.0.0.1:8000/accounts/login/`. Sign in to the seeded full-access 
 
 Google compares redirect URIs exactly. The scheme, hostname, port, path, and trailing slash must match the address used to open TurfIQ.
 
+## Local HTTPS development
+
+Install the dependencies and start the development-only HTTPS server:
+
+```powershell
+python -m pip install -r requirements.txt
+New-Item -ItemType Directory -Force .local-certs | Out-Null
+python manage.py runserver_plus 127.0.0.1:8000 --cert-file .local-certs/turfiq.crt --key-file .local-certs/turfiq.key
+```
+
+Open `https://127.0.0.1:8000/`. The generated certificate is self-signed, so a
+browser warning is expected; proceed only for this local address. The certificate
+and private key stay under the git-ignored `.local-certs/` directory. Keep
+`DJANGO_DEBUG=1` locally; production HTTPS enforcement remains active when debug
+mode is disabled.
+
 4. Configure credentials before starting Django:
 
 ```powershell

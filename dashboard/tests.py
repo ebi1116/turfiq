@@ -39,8 +39,9 @@ class DashboardTests(TestCase):
     def test_booking_suggests_and_reuses_customer_name_case_insensitively(self):
         existing = Customer.objects.get(owner=self.user, name="Test Customer")
         response = self.client.get(reverse("booking-add"))
-        self.assertContains(response, '<datalist id="customerSuggestions">')
-        self.assertContains(response, 'value="Test Customer"')
+        self.assertContains(response, 'id="customerCombobox"')
+        self.assertContains(response, 'id="customerSuggestions"')
+        self.assertContains(response, '"name": "Test Customer"')
         ground = Ground.objects.get(owner=self.user)
 
         response = self.client.post(reverse("booking-add"), {

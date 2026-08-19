@@ -22,7 +22,7 @@ class CustomerForm(forms.ModelForm):
 
 
 class BookingForm(forms.ModelForm):
-    customer_name = forms.CharField(max_length=120, label="Customer or Team name", widget=forms.TextInput(attrs={"list": "customerSuggestions", "autocomplete": "off"}))
+    customer_name = forms.CharField(max_length=120, label="Customer or Team name", widget=forms.TextInput(attrs={"autocomplete": "off", "role": "combobox", "aria-autocomplete": "list", "aria-controls": "customerSuggestions"}))
     customer_phone = forms.CharField(max_length=20, required=False, label="Mobile number (optional)")
 
     class Meta:

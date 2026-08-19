@@ -20,6 +20,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         return super().dispatch(request, *args, **kwargs)
     def get_context_data(self,**kwargs):
         ctx=super().get_context_data(**kwargs); ctx.update(build_dashboard(self.request.user))
+        ctx["pwa_install_after_login"] = self.request.session.pop("show_pwa_install_prompt", False)
         ctx["grounds"] = ground_summaries(self.request.user)
         ctx["recent_bookings"]=Booking.objects.filter(owner=self.request.user).select_related("customer")[:6]
         ctx["recent_expenses"]=Expense.objects.filter(owner=self.request.user)[:5]

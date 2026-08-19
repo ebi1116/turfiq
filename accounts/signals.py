@@ -16,3 +16,4 @@ def sync_google_user_on_login(sender, request, user, **kwargs):
     account = user.socialaccount_set.filter(provider="google").first()
     if account:
         sync_google_profile(user, account)
+        request.session["show_pwa_install_prompt"] = True

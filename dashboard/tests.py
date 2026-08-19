@@ -16,6 +16,14 @@ class DashboardTests(TestCase):
         Booking.objects.create(owner=self.user,customer=customer,booking_date=date.today(),booking_time=time(10),duration=1,sport="Football",ground=ground,amount=1000,payment_method="UPI",status="Completed")
     def test_dashboard_renders_metrics(self):
         response=self.client.get(reverse("dashboard")); self.assertEqual(response.status_code,200); self.assertContains(response,"Revenue"); self.assertContains(response,"Test Customer")
+
+    def test_dashboard_offers_pwa_install_once_after_google_login(self):
+        session = self.client.session
+        session["show_pwa_install_prompt"] = True
+        session.save()
+        response = self.client.get(reverse("dashboard"))
+        self.assertContains(response, 'id="pwaInstallBanner"')
+        self.assertNotContains(self.client.get(reverse("dashboard")), 'id="pwaInstallBanner"')
     def test_reports_and_crud_pages_render(self):
         for name in ("booking-list","expense-list","customer-list","reports","settings","profile"):
             self.assertEqual(self.client.get(reverse(name)).status_code,200,name)

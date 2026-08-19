@@ -36,6 +36,24 @@ class DashboardTests(TestCase):
         self.assertRedirects(response, reverse("booking-list"))
         self.assertTrue(Customer.objects.filter(owner=self.user, name="Weekend Warriors", phone="").exists())
 
+    def test_booking_suggests_and_reuses_customer_name_case_insensitively(self):
+        existing = Customer.objects.get(owner=self.user, name="Test Customer")
+        response = self.client.get(reverse("booking-add"))
+        self.assertContains(response, '<datalist id="customerSuggestions">')
+        self.assertContains(response, 'value="Test Customer"')
+        ground = Ground.objects.get(owner=self.user)
+
+        response = self.client.post(reverse("booking-add"), {
+            "customer_name": "test customer", "customer_phone": "",
+            "booking_date": date.today(), "booking_time": "13:00", "duration": "1",
+            "sport": "Football", "ground": ground.pk, "amount": "500",
+            "payment_method": "Cash", "status": "Confirmed", "is_paid": "on", "notes": "",
+        })
+
+        self.assertRedirects(response, reverse("booking-list"))
+        self.assertEqual(Customer.objects.filter(owner=self.user).count(), 1)
+        self.assertEqual(Booking.objects.filter(customer=existing).count(), 2)
+
     def test_profile_creates_and_safely_deactivates_grounds(self):
         payload = {"business_name":"Green Arena", "owner_name":"John", "phone_number":"9876543210", "address":"", "number_of_grounds":3,
                    "currency":self.user.business_settings.currency, "timezone":"Asia/Kolkata", "opening_time":"06:00", "closing_time":"23:00", "monthly_revenue_goal":"100000",

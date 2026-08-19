@@ -2,6 +2,7 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.db.models import Q
+from django.db.models.functions import Lower, Trim
 from business.models import Ground
 
 class Customer(models.Model):
@@ -11,7 +12,10 @@ class Customer(models.Model):
     email = models.EmailField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["owner", "phone"], condition=~Q(phone=""), name="unique_owner_customer_phone")]
+        constraints = [
+            models.UniqueConstraint(fields=["owner", "phone"], condition=~Q(phone=""), name="unique_owner_customer_phone"),
+            models.UniqueConstraint(Lower(Trim("name")), "owner", name="unique_owner_customer_name_ci"),
+        ]
         ordering = ["name"]
     def __str__(self): return f"{self.name} — {self.phone}" if self.phone else self.name
 

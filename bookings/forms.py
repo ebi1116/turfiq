@@ -10,9 +10,19 @@ class CustomerForm(forms.ModelForm):
         fields = ("name", "phone", "email")
         labels = {"name": "Customer or Team name", "phone": "Mobile number (optional)"}
 
+    def __init__(self, *args, **kwargs):
+        self._user = kwargs.pop("user", None)
+        super().__init__(*args, **kwargs)
+
+    def clean_name(self):
+        name = self.cleaned_data["name"].strip()
+        if self._user and Customer.objects.filter(owner=self._user, name__iexact=name).exists():
+            raise forms.ValidationError("This customer or team already exists.")
+        return name
+
 
 class BookingForm(forms.ModelForm):
-    customer_name = forms.CharField(max_length=120, label="Customer or Team name")
+    customer_name = forms.CharField(max_length=120, label="Customer or Team name", widget=forms.TextInput(attrs={"list": "customerSuggestions", "autocomplete": "off"}))
     customer_phone = forms.CharField(max_length=20, required=False, label="Mobile number (optional)")
 
     class Meta:

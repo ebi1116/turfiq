@@ -10,10 +10,10 @@ python -m venv .venv
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py seed_demo
-python manage.py runserver
+.\run_https.ps1
 ```
 
-Open `http://127.0.0.1:8000/accounts/login/`. Sign in to the seeded full-access workspace with `demo` / `Demo@12345`, or continue with Google. The demo credentials can be overridden with `DEMO_LOGIN_USERNAME` and `DEMO_LOGIN_PASSWORD`.
+Open `https://127.0.0.1:8000/accounts/login/`. Sign in to the seeded full-access workspace with `demo` / `Demo@12345`, or continue with Google. The local certificate is self-signed, so the browser may show a one-time warning. The demo credentials can be overridden with `DEMO_LOGIN_USERNAME` and `DEMO_LOGIN_PASSWORD`.
 
 ## Google OAuth setup
 

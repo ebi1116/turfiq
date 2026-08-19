@@ -22,20 +22,29 @@ class BookingFormMixin(OwnedMixin):
         kwargs = super().get_form_kwargs()
         kwargs["user"] = self.request.user
         return kwargs
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["customer_options"] = list(Customer.objects.filter(owner=self.request.user).order_by("name").values("name", "phone"))
+        return context
     def form_valid(self, form):
         with transaction.atomic():
             name = form.cleaned_data["customer_name"]
             phone = form.cleaned_data["customer_phone"]
-            customer = Customer.objects.filter(owner=self.request.user, phone=phone).first() if phone else None
+            customer = Customer.objects.filter(owner=self.request.user, name__iexact=name).first()
+            if customer is None and phone:
+                customer = Customer.objects.filter(owner=self.request.user, phone=phone).first()
             if customer is None and form.instance.pk and not phone and not form.instance.customer.phone:
                 customer = form.instance.customer
-            if customer is None and not phone:
-                customer = Customer.objects.filter(owner=self.request.user, phone="", name__iexact=name).first()
             if customer is None:
                 customer = Customer.objects.create(owner=self.request.user, name=name, phone=phone)
-            elif customer.name != name:
-                customer.name = name
-                customer.save(update_fields=("name",))
+            else:
+                changed = []
+                phone_available = not Customer.objects.filter(owner=self.request.user, phone=phone).exclude(pk=customer.pk).exists() if phone else False
+                if phone and not customer.phone and phone_available:
+                    customer.phone = phone
+                    changed.append("phone")
+                if changed:
+                    customer.save(update_fields=changed)
             form.instance.customer = customer
             form.instance.owner = self.request.user
             messages.success(self.request, "Booking saved. Customer or team was added to Customers automatically.")
@@ -55,6 +64,11 @@ class CustomerCreateView(LoginRequiredMixin, CreateView):
     form_class = CustomerForm
     template_name = "bookings/customer_form.html"
     success_url = reverse_lazy("customer-list")
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
 
     def form_valid(self, form):
         form.instance.owner = self.request.user

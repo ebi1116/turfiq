@@ -11,6 +11,7 @@ urlpatterns = [
     path("terms/", MarketingPageView.as_view(template_name="marketing/terms.html"), name="terms"),
     path("refund-policy/", MarketingPageView.as_view(template_name="marketing/refund.html"), name="refund-policy"),
     path("shipping-policy/", MarketingPageView.as_view(template_name="marketing/shipping.html"), name="shipping-policy"),
+    path("offline/", MarketingPageView.as_view(template_name="marketing/offline.html"), name="offline"),
     path("robots.txt", robots_txt, name="robots-txt"),
     path("sitemap.xml", sitemap_xml, name="sitemap"),
 ]

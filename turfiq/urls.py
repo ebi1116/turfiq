@@ -5,8 +5,11 @@ from django.urls import include, path
 from allauth.account.views import LogoutView
 from accounts.views import ProfileView, SignInPageView
 from subscriptions.views import create_order, verify_payment
+from marketing.views import service_worker, webmanifest
 
 urlpatterns = [
+    path("service-worker.js", service_worker, name="service-worker"),
+    path("manifest.webmanifest", webmanifest, name="webmanifest"),
     path("api/create-order", create_order, name="create-order"),
     path("api/verify-payment", verify_payment, name="verify-payment"),
     path("admin/", admin.site.urls),

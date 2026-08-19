@@ -91,3 +91,31 @@ document.addEventListener("DOMContentLoaded",()=>{
   if(window.AOS)AOS.init({duration:650,once:true,offset:30});
   document.querySelectorAll("img").forEach(img=>{if(!img.loading&&!img.closest(".brand-splash"))img.loading="lazy"});
 });
+// Offer PWA installation on the public website as well as the signed-in app.
+(() => {
+  if (window.matchMedia('(display-mode: standalone)').matches) return;
+  const manifest = document.createElement('link');
+  manifest.rel = 'manifest';
+  manifest.href = '/manifest.webmanifest';
+  document.head.appendChild(manifest);
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js', {scope: '/'}));
+  }
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    const style = document.createElement('style');
+    style.textContent = '.marketing-pwa-install{position:fixed;z-index:9999;right:16px;bottom:16px;width:min(420px,calc(100% - 32px));display:flex;align-items:center;gap:11px;padding:12px;border:1px solid rgba(255,255,255,.16);border-radius:16px;background:#10231c;color:#fff;box-shadow:0 20px 55px rgba(4,25,17,.3)}.marketing-pwa-install img{width:46px;height:46px;object-fit:contain;border-radius:11px;background:#fff}.marketing-pwa-install div{flex:1;min-width:0}.marketing-pwa-install strong,.marketing-pwa-install small{display:block}.marketing-pwa-install small{color:#a7bab2;font-size:10px}.marketing-pwa-install button{border:0;border-radius:10px;padding:9px 12px;background:#0dbb75;color:#062419;font-weight:700}.marketing-pwa-install .close-install{padding:7px;background:transparent;color:#a7bab2;font-size:18px}';
+    document.head.appendChild(style);
+    const banner = document.createElement('aside');
+    banner.className = 'marketing-pwa-install';
+    banner.innerHTML = '<img src="/static/images/turfiq-profile-logo-v2.png" alt=""><div><strong>Install TurfIQ</strong><small>Add TurfIQ to your home screen.</small></div><button type="button" class="start-install">Install</button><button type="button" class="close-install" aria-label="Not now">×</button>';
+    document.body.appendChild(banner);
+    banner.querySelector('.start-install').addEventListener('click', async () => {
+      event.prompt();
+      await event.userChoice;
+      banner.remove();
+    });
+    banner.querySelector('.close-install').addEventListener('click', () => banner.remove());
+    window.addEventListener('appinstalled', () => banner.remove(), {once: true});
+  }, {once: true});
+})();

@@ -37,13 +37,17 @@ def merge_duplicate_customers(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
+    # PostgreSQL must commit the Booking FK updates from the data migration
+    # before it can create a new index on the referenced Customer table.
+    atomic = False
+
     dependencies = [
         ('bookings', '0004_remove_customer_unique_owner_customer_phone_and_more'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
-        migrations.RunPython(merge_duplicate_customers, migrations.RunPython.noop),
+        migrations.RunPython(merge_duplicate_customers, migrations.RunPython.noop, atomic=True),
         migrations.AddConstraint(
             model_name='customer',
             constraint=models.UniqueConstraint(django.db.models.functions.text.Lower(django.db.models.functions.text.Trim('name')), models.F('owner'), name='unique_owner_customer_name_ci'),

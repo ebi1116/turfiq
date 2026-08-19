@@ -7,13 +7,13 @@ from business.models import Ground
 class Customer(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="customers")
     name = models.CharField(max_length=120)
-    phone = models.CharField(max_length=20)
+    phone = models.CharField(max_length=20, blank=True)
     email = models.EmailField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["owner", "phone"], name="unique_owner_customer_phone")]
+        constraints = [models.UniqueConstraint(fields=["owner", "phone"], condition=~Q(phone=""), name="unique_owner_customer_phone")]
         ordering = ["name"]
-    def __str__(self): return f"{self.name} — {self.phone}"
+    def __str__(self): return f"{self.name} — {self.phone}" if self.phone else self.name
 
 class Booking(models.Model):
     SPORTS = [(x, x) for x in ("Football", "Cricket", "Badminton", "Other")]

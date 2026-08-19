@@ -22,13 +22,19 @@ class DashboardTests(TestCase):
     def test_csv_export(self):
         response=self.client.get(reverse("report-export",args=["csv"])); self.assertEqual(response.status_code,200); self.assertIn("text/csv",response["Content-Type"])
 
-    def test_customer_can_be_added_and_selected_in_booking(self):
-        response = self.client.post(reverse("customer-add"), {"name": "New Player", "phone": "9111111111", "email": "player@example.com"})
-        self.assertRedirects(response, reverse("customer-list"))
-        customer = Customer.objects.get(owner=self.user, phone="9111111111")
+    def test_booking_accepts_manual_customer_and_stores_it(self):
         response = self.client.get(reverse("booking-add"))
-        self.assertContains(response, f"New Player — 9111111111")
-        self.assertContains(response, f'value="{customer.pk}"')
+        self.assertContains(response, "Customer or Team name")
+        self.assertContains(response, "Mobile number (optional)")
+        ground = Ground.objects.get(owner=self.user)
+        response = self.client.post(reverse("booking-add"), {
+            "customer_name": "Weekend Warriors", "customer_phone": "",
+            "booking_date": date.today(), "booking_time": "12:00", "duration": "1",
+            "sport": "Football", "ground": ground.pk, "amount": "500",
+            "payment_method": "Cash", "status": "Confirmed", "is_paid": "on", "notes": "",
+        })
+        self.assertRedirects(response, reverse("booking-list"))
+        self.assertTrue(Customer.objects.filter(owner=self.user, name="Weekend Warriors", phone="").exists())
 
     def test_profile_creates_and_safely_deactivates_grounds(self):
         payload = {"business_name":"Green Arena", "owner_name":"John", "phone_number":"9876543210", "address":"", "number_of_grounds":3,

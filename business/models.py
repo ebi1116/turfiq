@@ -16,6 +16,7 @@ class BusinessSettings(models.Model):
     opening_time = models.TimeField(default=time(6, 0))
     closing_time = models.TimeField(default=time(23, 0))
     monthly_revenue_goal = models.DecimalField(max_digits=12, decimal_places=2, default=100000)
+    onboarding_completed = models.BooleanField(default=False)
     def __str__(self): return self.business_name
 
 

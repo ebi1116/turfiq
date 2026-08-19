@@ -1,5 +1,6 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
+from django.db import transaction
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 from .forms import BookingForm, CustomerForm
@@ -22,9 +23,23 @@ class BookingFormMixin(OwnedMixin):
         kwargs["user"] = self.request.user
         return kwargs
     def form_valid(self, form):
-        form.instance.owner = self.request.user
-        messages.success(self.request, "Booking saved successfully.")
-        return super().form_valid(form)
+        with transaction.atomic():
+            name = form.cleaned_data["customer_name"]
+            phone = form.cleaned_data["customer_phone"]
+            customer = Customer.objects.filter(owner=self.request.user, phone=phone).first() if phone else None
+            if customer is None and form.instance.pk and not phone and not form.instance.customer.phone:
+                customer = form.instance.customer
+            if customer is None and not phone:
+                customer = Customer.objects.filter(owner=self.request.user, phone="", name__iexact=name).first()
+            if customer is None:
+                customer = Customer.objects.create(owner=self.request.user, name=name, phone=phone)
+            elif customer.name != name:
+                customer.name = name
+                customer.save(update_fields=("name",))
+            form.instance.customer = customer
+            form.instance.owner = self.request.user
+            messages.success(self.request, "Booking saved. Customer or team was added to Customers automatically.")
+            return super().form_valid(form)
 class BookingCreateView(BookingFormMixin, CreateView): pass
 class BookingUpdateView(BookingFormMixin, UpdateView): pass
 class BookingDeleteView(OwnedMixin, DeleteView):

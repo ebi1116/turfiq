@@ -8,13 +8,17 @@ class CustomerForm(forms.ModelForm):
     class Meta:
         model = Customer
         fields = ("name", "phone", "email")
+        labels = {"name": "Customer or Team name", "phone": "Mobile number (optional)"}
 
 
 class BookingForm(forms.ModelForm):
+    customer_name = forms.CharField(max_length=120, label="Customer or Team name")
+    customer_phone = forms.CharField(max_length=20, required=False, label="Mobile number (optional)")
+
     class Meta:
         model = Booking
         fields = (
-            "customer", "booking_date", "booking_time", "duration", "sport",
+            "booking_date", "booking_time", "duration", "sport",
             "ground", "amount", "payment_method", "status", "is_paid", "notes",
         )
         widgets = {"booking_date": forms.DateInput(attrs={"type":"date"}), "booking_time": forms.TimeInput(attrs={"type":"time"}), "notes": forms.Textarea(attrs={"rows":3})}
@@ -23,8 +27,10 @@ class BookingForm(forms.ModelForm):
         user = kwargs.pop("user", None)
         self._user = user
         super().__init__(*args, **kwargs)
-        self.fields["customer"].queryset = Customer.objects.filter(owner=user).order_by("name") if user else Customer.objects.none()
-        self.fields["customer"].empty_label = "Select a customer"
+        self.order_fields(("customer_name", "customer_phone", "booking_date", "booking_time", "duration", "sport", "ground", "amount", "payment_method", "status", "is_paid", "notes"))
+        if self.instance and self.instance.pk and self.instance.customer_id:
+            self.fields["customer_name"].initial = self.instance.customer.name
+            self.fields["customer_phone"].initial = self.instance.customer.phone
         if user:
             allowed = Q(is_active=True)
             if self.instance and self.instance.pk and self.instance.ground_id:
@@ -39,3 +45,9 @@ class BookingForm(forms.ModelForm):
         if self._user and ground.owner_id != self._user.id:
             raise forms.ValidationError("Select one of your own grounds.")
         return ground
+
+    def clean_customer_name(self):
+        return self.cleaned_data["customer_name"].strip()
+
+    def clean_customer_phone(self):
+        return self.cleaned_data["customer_phone"].strip()

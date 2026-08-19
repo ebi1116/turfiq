@@ -2,16 +2,22 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import TemplateView
 from bookings.models import Booking, Customer
 from expenses.models import Expense
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.http import JsonResponse
 from django.utils import timezone
 from datetime import datetime, timedelta
 from django.contrib.auth.decorators import login_required
-from business.models import Ground
+from business.models import BusinessSettings, Ground
 from .services import build_dashboard, ground_summaries, get_daily_booking_analytics
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name="dashboard/index.html"
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and hasattr(request.user, "google_profile"):
+            settings = BusinessSettings.objects.filter(owner=request.user).first()
+            if not settings or not settings.onboarding_completed:
+                return redirect("turf-onboarding")
+        return super().dispatch(request, *args, **kwargs)
     def get_context_data(self,**kwargs):
         ctx=super().get_context_data(**kwargs); ctx.update(build_dashboard(self.request.user))
         ctx["grounds"] = ground_summaries(self.request.user)

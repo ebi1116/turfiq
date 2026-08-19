@@ -93,6 +93,24 @@ class AuthenticationTests(TestCase):
         self.assertRedirects(response, reverse("home"))
         self.assertNotIn("_auth_user_id", self.client.session)
 
+    def test_new_google_owner_completes_turf_setup_before_dashboard(self):
+        user = User.objects.create_user(username="new-google-owner")
+        GoogleUserProfile.objects.create(user=user)
+        self.client.force_login(user)
+        self.assertRedirects(self.client.get(reverse("dashboard")), reverse("turf-onboarding"))
+
+        response = self.client.post(reverse("turf-onboarding"), {
+            "number_of_grounds": 2,
+            "turf_name_1": "North Arena",
+            "turf_name_2": "South Arena",
+        })
+
+        self.assertRedirects(response, reverse("dashboard"))
+        settings = user.business_settings
+        self.assertTrue(settings.onboarding_completed)
+        self.assertEqual(settings.number_of_grounds, 2)
+        self.assertEqual(list(settings.grounds.values_list("name", flat=True)), ["North Arena", "South Arena"])
+
     def test_logout_destroys_session_and_returns_home(self):
         user = User.objects.create_user(username="owner")
         self.client.force_login(user)

@@ -1,8 +1,14 @@
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.urls import reverse
+from django.contrib import messages
+from django.shortcuts import redirect
+from allauth.core.exceptions import ImmediateHttpResponse
+import logging
 
 from .services import sync_google_profile
+
+logger = logging.getLogger(__name__)
 
 
 def role_login_redirect_url(user):
@@ -31,6 +37,19 @@ class GoogleOnlySocialAccountAdapter(DefaultSocialAccountAdapter):
 
     def is_auto_signup_allowed(self, request, sociallogin):
         return sociallogin.account.provider == "google"
+
+    def on_authentication_error(self, request, provider, error=None, exception=None, extra_context=None):
+        logger.warning(
+            "Google authentication callback failed (authenticated=%s, error=%s, exception=%s)",
+            request.user.is_authenticated,
+            error or "unknown",
+            exception.__class__.__name__ if exception else "none",
+        )
+        if request.user.is_authenticated:
+            messages.info(request, "You are already signed in.")
+            raise ImmediateHttpResponse(redirect(role_login_redirect_url(request.user)))
+        messages.error(request, "Google sign-in could not be completed. Please try again.")
+        raise ImmediateHttpResponse(redirect("login"))
 
     def save_user(self, request, sociallogin, form=None):
         user = super().save_user(request, sociallogin, form=None)

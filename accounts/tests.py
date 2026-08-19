@@ -5,6 +5,11 @@ from django.urls import reverse
 
 from .models import GoogleUserProfile
 from .services import sync_google_profile
+from .adapters import GoogleOnlySocialAccountAdapter
+from allauth.core.exceptions import ImmediateHttpResponse
+from django.contrib.messages.storage.fallback import FallbackStorage
+from django.contrib.sessions.middleware import SessionMiddleware
+from django.test import RequestFactory
 
 
 class AuthenticationTests(TestCase):
@@ -117,3 +122,33 @@ class AuthenticationTests(TestCase):
         response = self.client.post(reverse("logout"))
         self.assertRedirects(response, reverse("home"))
         self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_google_callback_error_recovers_authenticated_mobile_session(self):
+        user = User.objects.create_user(username="mobile-owner")
+        request = RequestFactory().get("/accounts/google/login/callback/")
+        SessionMiddleware(lambda req: None).process_request(request)
+        request.session.save()
+        request.user = user
+        setattr(request, "_messages", FallbackStorage(request))
+
+        with self.assertRaises(ImmediateHttpResponse) as captured:
+            GoogleOnlySocialAccountAdapter().on_authentication_error(
+                request, provider=type("Provider", (), {"id": "google"})(), error="oauth_error"
+            )
+
+        self.assertEqual(captured.exception.response.url, reverse("dashboard"))
+
+    def test_google_callback_error_returns_anonymous_mobile_user_to_login(self):
+        from django.contrib.auth.models import AnonymousUser
+        request = RequestFactory().get("/accounts/google/login/callback/")
+        SessionMiddleware(lambda req: None).process_request(request)
+        request.session.save()
+        request.user = AnonymousUser()
+        setattr(request, "_messages", FallbackStorage(request))
+
+        with self.assertRaises(ImmediateHttpResponse) as captured:
+            GoogleOnlySocialAccountAdapter().on_authentication_error(
+                request, provider=type("Provider", (), {"id": "google"})(), error="oauth_error"
+            )
+
+        self.assertEqual(captured.exception.response.url, reverse("login"))

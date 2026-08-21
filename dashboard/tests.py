@@ -5,6 +5,8 @@ from django.urls import reverse
 from bookings.models import Booking, Customer, BlockedSlot
 from dashboard.services import get_daily_booking_analytics
 from django.utils import timezone
+from io import BytesIO
+from openpyxl import load_workbook
 from subscriptions.models import Subscription
 from business.models import BusinessSettings, Ground
 
@@ -26,6 +28,20 @@ class DashboardTests(TestCase):
             self.assertEqual(self.client.get(reverse(name)).status_code,200,name)
     def test_csv_export(self):
         response=self.client.get(reverse("report-export",args=["csv"])); self.assertEqual(response.status_code,200); self.assertIn("text/csv",response["Content-Type"])
+
+    def test_xlsx_export_has_professional_header_and_data_formatting(self):
+        response = self.client.get(reverse("report-export", args=["xlsx"]))
+        self.assertEqual(response.status_code, 200)
+        workbook = load_workbook(BytesIO(response.content))
+        sheet = workbook["Bookings"]
+        self.assertEqual(sheet["A1"].value, "Date")
+        self.assertTrue(sheet["A1"].font.bold)
+        self.assertEqual(sheet["A1"].font.color.rgb, "00FFFFFF")
+        self.assertEqual(sheet["A1"].fill.fgColor.rgb, "00128A4B")
+        self.assertFalse(sheet["A2"].font.bold)
+        self.assertEqual(sheet["F2"].number_format, "₹#,##0.00")
+        self.assertEqual(sheet.freeze_panes, "A2")
+        self.assertEqual(sheet.auto_filter.ref, sheet.dimensions)
 
     def test_booking_accepts_manual_customer_and_stores_it(self):
         response = self.client.get(reverse("booking-add"))

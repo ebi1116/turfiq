@@ -45,6 +45,9 @@ class ExpenseManualEntryTests(TestCase):
     def test_category_and_amount_are_manual_text_inputs(self):
         response = self.client.get(reverse("expense-add"))
         self.assertContains(response, 'list="expense-category-options"')
+        self.assertContains(response, 'value="Ground Maintenance"')
+        self.assertContains(response, 'value="Turf Grass Replacement"')
+        self.assertContains(response, 'value="Marketing &amp; Advertising"')
         self.assertNotContains(response, 'name="amount" type="number"')
         response = self.client.post(reverse("expense-add"), {
             "category": "Marketing", "amount": "1250.75",

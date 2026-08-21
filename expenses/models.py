@@ -1,7 +1,36 @@
 from django.contrib.auth.models import User
 from django.db import models
 class Expense(models.Model):
-    CATEGORIES = [(x, x) for x in ("Electricity", "Salary", "Maintenance", "Water", "Internet", "Rent", "Cleaning", "Other")]
+    CATEGORIES = [(x, x) for x in (
+        "Electricity",
+        "Staff Salary",
+        "Staff Incentives",
+        "Ground Maintenance",
+        "Building Maintenance",
+        "Equipment Purchase",
+        "Equipment Repair",
+        "Sports Equipment",
+        "Turf Grass Replacement",
+        "Water",
+        "Internet & Phone",
+        "Rent / Lease",
+        "Cleaning",
+        "Security",
+        "Generator Fuel",
+        "Marketing & Advertising",
+        "Software Subscription",
+        "Insurance",
+        "Taxes & Licences",
+        "Refreshments",
+        "Laundry",
+        "Pest Control",
+        "Waste Disposal",
+        "Bank & Payment Charges",
+        "Professional Fees",
+        "Travel & Transport",
+        "Office Supplies",
+        "Other",
+    )]
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="expenses")
     category = models.CharField(max_length=30)
     amount = models.DecimalField(max_digits=10, decimal_places=2)

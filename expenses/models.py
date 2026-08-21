@@ -3,7 +3,7 @@ from django.db import models
 class Expense(models.Model):
     CATEGORIES = [(x, x) for x in ("Electricity", "Salary", "Maintenance", "Water", "Internet", "Rent", "Cleaning", "Other")]
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="expenses")
-    category = models.CharField(max_length=30, choices=CATEGORIES)
+    category = models.CharField(max_length=30)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     expense_date = models.DateField(db_index=True)
     notes = models.TextField(blank=True)

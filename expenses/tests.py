@@ -6,6 +6,8 @@ from django.test import RequestFactory, TestCase
 
 from .admin import ExpenseAdmin
 from .models import Expense
+from django.urls import reverse
+from subscriptions.models import Subscription
 
 
 class ExpenseAdminIsolationTests(TestCase):
@@ -32,3 +34,21 @@ class ExpenseAdminIsolationTests(TestCase):
 
     def test_owner_cannot_open_another_owners_expense(self):
         self.assertFalse(self.model_admin.has_view_permission(self.request_for(self.owner_a), self.expense_b))
+
+
+class ExpenseManualEntryTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user("expense-form-owner", password="test-pass-123")
+        Subscription.objects.create(owner=self.owner, status="active")
+        self.client.force_login(self.owner)
+
+    def test_category_and_amount_are_manual_text_inputs(self):
+        response = self.client.get(reverse("expense-add"))
+        self.assertContains(response, 'list="expense-category-options"')
+        self.assertNotContains(response, 'name="amount" type="number"')
+        response = self.client.post(reverse("expense-add"), {
+            "category": "Marketing", "amount": "1250.75",
+            "expense_date": date.today(), "notes": "Campaign",
+        })
+        self.assertRedirects(response, reverse("expense-list"))
+        self.assertTrue(Expense.objects.filter(owner=self.owner, category="Marketing").exists())

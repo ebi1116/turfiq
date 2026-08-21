@@ -24,6 +24,10 @@ class CustomerForm(forms.ModelForm):
 class BookingForm(forms.ModelForm):
     customer_name = forms.CharField(max_length=120, label="Customer or Team name", widget=forms.TextInput(attrs={"autocomplete": "off", "role": "combobox", "aria-autocomplete": "list", "aria-controls": "customerSuggestions"}))
     customer_phone = forms.CharField(max_length=20, required=False, label="Mobile number (optional)")
+    ground = forms.CharField(
+        label="Ground",
+        widget=forms.TextInput(attrs={"list": "ground-options", "autocomplete": "off", "placeholder": "Type or select a ground"}),
+    )
 
     class Meta:
         model = Booking
@@ -31,7 +35,13 @@ class BookingForm(forms.ModelForm):
             "booking_date", "booking_time", "duration", "sport",
             "ground", "amount", "payment_method", "status", "is_paid", "notes",
         )
-        widgets = {"booking_date": forms.DateInput(attrs={"type":"date"}), "booking_time": forms.TimeInput(attrs={"type":"time"}), "notes": forms.Textarea(attrs={"rows":3})}
+        widgets = {
+            "booking_date": forms.DateInput(attrs={"type": "date"}),
+            "booking_time": forms.TimeInput(attrs={"type": "time"}),
+            "duration": forms.TextInput(attrs={"inputmode": "decimal", "list": "duration-options", "autocomplete": "off", "placeholder": "e.g. 1.5"}),
+            "amount": forms.TextInput(attrs={"inputmode": "decimal", "autocomplete": "off", "placeholder": "Enter amount"}),
+            "notes": forms.Textarea(attrs={"rows": 3}),
+        }
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user", None)
@@ -45,15 +55,20 @@ class BookingForm(forms.ModelForm):
             allowed = Q(is_active=True)
             if self.instance and self.instance.pk and self.instance.ground_id:
                 allowed |= Q(pk=self.instance.ground_id)
-            self.fields["ground"].queryset = Ground.objects.filter(Q(owner=user) & allowed).order_by("number")
+            self._grounds = list(Ground.objects.filter(Q(owner=user) & allowed).order_by("number"))
         else:
-            self.fields["ground"].queryset = Ground.objects.none()
-        self.fields["ground"].empty_label = "Select a ground"
+            self._grounds = []
+        self.ground_options = [ground.display_name for ground in self._grounds]
+        if not self.is_bound and self.instance and self.instance.pk and self.instance.ground_id:
+            self.initial["ground"] = self.instance.ground.display_name
 
     def clean_ground(self):
-        ground = self.cleaned_data["ground"]
-        if self._user and ground.owner_id != self._user.id:
-            raise forms.ValidationError("Select one of your own grounds.")
+        value = self.cleaned_data["ground"].strip()
+        ground = next((item for item in self._grounds if str(item.pk) == value), None)
+        if ground is None:
+            ground = next((item for item in self._grounds if item.display_name.casefold() == value.casefold()), None)
+        if ground is None:
+            raise forms.ValidationError("Choose an existing ground from the suggestions.")
         return ground
 
     def clean_customer_name(self):

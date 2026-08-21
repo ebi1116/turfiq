@@ -12,7 +12,10 @@
   {% for field in form %}{% if field.name != 'customer_name' and field.name != 'customer_phone' %}<div class="col-md-{% if field.name == 'notes' %}12{% else %}6{% endif %}">{{ field|as_crispy_field }}</div>{% endif %}{% endfor %}
  </div>
  <div class="form-actions"><a href="{% url 'booking-list' %}" class="btn btn-light">Cancel</a><button class="btn btn-primary"><i class="fa-solid fa-check me-2"></i>Save booking</button></div>
-</form></article>{{ customer_options|json_script:"customer-options-data" }}
+</form></article>
+<datalist id="duration-options"><option value="0.5"><option value="1"><option value="1.5"><option value="2"><option value="2.5"><option value="3"></datalist>
+<datalist id="ground-options">{% for ground in form.ground_options %}<option value="{{ ground }}">{% endfor %}</datalist>
+{{ customer_options|json_script:"customer-options-data" }}
 {% endblock %}
 {% block extra_js %}<script>
 document.addEventListener('DOMContentLoaded',()=>{

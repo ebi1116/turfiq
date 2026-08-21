@@ -60,6 +60,23 @@ class DashboardTests(TestCase):
         self.assertEqual(Customer.objects.filter(owner=self.user).count(), 1)
         self.assertEqual(Booking.objects.filter(customer=existing).count(), 2)
 
+    def test_booking_uses_manual_entry_fields_and_accepts_ground_name(self):
+        response = self.client.get(reverse("booking-add"))
+        self.assertContains(response, 'id="ground-options"')
+        self.assertContains(response, 'list="ground-options"')
+        self.assertContains(response, 'list="duration-options"')
+        self.assertNotContains(response, 'name="amount" type="number"')
+
+        response = self.client.post(reverse("booking-add"), {
+            "customer_name": "Manual Ground Customer", "customer_phone": "",
+            "booking_date": date.today(), "booking_time": "14:00", "duration": "1.5",
+            "sport": "Football", "ground": "a", "amount": "750.50",
+            "payment_method": "Cash", "status": "Confirmed", "notes": "",
+        })
+        self.assertRedirects(response, reverse("booking-list"))
+        booking = Booking.objects.get(customer__name="Manual Ground Customer")
+        self.assertEqual(booking.ground.display_name, "A")
+
     def test_profile_creates_and_safely_deactivates_grounds(self):
         payload = {"business_name":"Green Arena", "owner_name":"John", "phone_number":"9876543210", "address":"", "number_of_grounds":3,
                    "currency":self.user.business_settings.currency, "timezone":"Asia/Kolkata", "opening_time":"06:00", "closing_time":"23:00", "monthly_revenue_goal":"100000",

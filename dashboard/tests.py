@@ -9,6 +9,7 @@ from io import BytesIO
 from openpyxl import load_workbook
 from subscriptions.models import Subscription
 from business.models import BusinessSettings, Ground
+from expenses.models import Expense
 
 class DashboardTests(TestCase):
     def setUp(self):
@@ -16,6 +17,7 @@ class DashboardTests(TestCase):
         customer=Customer.objects.create(owner=self.user,name="Test Customer",phone="9000000000")
         turf=BusinessSettings.objects.create(owner=self.user); ground=Ground.objects.create(owner=self.user,turf=turf,number=1,name="A")
         Booking.objects.create(owner=self.user,customer=customer,booking_date=date.today(),booking_time=time(10),duration=1,sport="Football",ground=ground,amount=1000,payment_method="UPI",status="Completed")
+        Expense.objects.create(owner=self.user, category="Electricity", amount=250, expense_date=date.today())
     def test_dashboard_renders_metrics(self):
         response=self.client.get(reverse("dashboard")); self.assertEqual(response.status_code,200); self.assertContains(response,"Revenue"); self.assertContains(response,"Test Customer")
 
@@ -39,9 +41,18 @@ class DashboardTests(TestCase):
         self.assertEqual(sheet["A1"].font.color.rgb, "00FFFFFF")
         self.assertEqual(sheet["A1"].fill.fgColor.rgb, "00128A4B")
         self.assertFalse(sheet["A2"].font.bold)
-        self.assertEqual(sheet["F2"].number_format, "₹#,##0.00")
+        self.assertEqual(sheet["H2"].number_format, "₹#,##0.00")
         self.assertEqual(sheet.freeze_panes, "A2")
         self.assertEqual(sheet.auto_filter.ref, sheet.dimensions)
+        self.assertIn("BookingsTable", sheet.tables)
+        self.assertEqual(workbook.sheetnames, ["Dashboard", "Bookings", "Expenses", "Pivot Tables"])
+        self.assertEqual(workbook["Expenses"]["B2"].value, "Electricity")
+        self.assertEqual(workbook["Dashboard"]["A6"].value, 1000)
+        pivot = workbook["Pivot Tables"]
+        self.assertEqual(pivot["A1"].value, "Monthly Performance")
+        self.assertEqual(pivot["C3"].value, 1000)
+        self.assertEqual(pivot["D3"].value, 250)
+        self.assertGreaterEqual(len(pivot._charts), 3)
 
     def test_booking_accepts_manual_customer_and_stores_it(self):
         response = self.client.get(reverse("booking-add"))

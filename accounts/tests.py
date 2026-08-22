@@ -16,7 +16,7 @@ class AuthenticationTests(TestCase):
     def test_login_page_only_has_google_authentication(self):
         response = self.client.get(reverse("login"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Login")
+        self.assertContains(response, "Continue with Google")
         self.assertContains(response, 'action="/accounts/google/login/"')
         self.assertNotContains(response, 'type="password"')
         self.assertNotContains(response, 'name="username"')

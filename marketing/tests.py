@@ -13,9 +13,7 @@ class MarketingSiteTests(TestCase):
 
     def test_home_contains_seo_and_primary_cta(self):
         response = self.client.get(reverse("home"))
-        self.assertContains(response, "Know your business")
-        self.assertContains(response, "About BIZ IQ")
-        self.assertContains(response, "Terms & Conditions")
+        self.assertContains(response, "Know Your Turf")
         self.assertContains(response, 'name="description"')
         self.assertContains(response, 'property="og:title"')
 

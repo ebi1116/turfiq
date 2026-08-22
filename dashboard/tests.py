@@ -32,6 +32,13 @@ class DashboardTests(TestCase):
         response=self.client.get(reverse("report-export",args=["csv"])); self.assertEqual(response.status_code,200); self.assertIn("text/csv",response["Content-Type"])
 
     def test_xlsx_export_has_professional_header_and_data_formatting(self):
+        booking = Booking.objects.get(owner=self.user)
+        Booking.objects.create(
+            owner=self.user, customer=booking.customer, booking_date=date.today(),
+            booking_time=time(11), duration=1, sport="Cricket", ground=booking.ground,
+            amount=750, payment_method="Cash", status="Confirmed",
+        )
+        Expense.objects.create(owner=self.user, category="Water", amount=100, expense_date=date.today())
         response = self.client.get(reverse("report-export", args=["xlsx"]))
         self.assertEqual(response.status_code, 200)
         workbook = load_workbook(BytesIO(response.content))
@@ -42,16 +49,17 @@ class DashboardTests(TestCase):
         self.assertEqual(sheet["A1"].fill.fgColor.rgb, "00128A4B")
         self.assertFalse(sheet["A2"].font.bold)
         self.assertEqual(sheet["H2"].number_format, "₹#,##0.00")
+        self.assertEqual(sheet["H3"].number_format, "₹#,##0.00")
         self.assertEqual(sheet.freeze_panes, "A2")
         self.assertEqual(sheet.auto_filter.ref, sheet.dimensions)
         self.assertIn("BookingsTable", sheet.tables)
         self.assertEqual(workbook.sheetnames, ["Dashboard", "Bookings", "Expenses", "Pivot Tables"])
-        self.assertEqual(workbook["Expenses"]["B2"].value, "Electricity")
-        self.assertEqual(workbook["Dashboard"]["A6"].value, 1000)
+        self.assertEqual({workbook["Expenses"]["B2"].value, workbook["Expenses"]["B3"].value}, {"Electricity", "Water"})
+        self.assertEqual(workbook["Dashboard"]["A6"].value, 1750)
         pivot = workbook["Pivot Tables"]
         self.assertEqual(pivot["A1"].value, "Monthly Performance")
-        self.assertEqual(pivot["C3"].value, 1000)
-        self.assertEqual(pivot["D3"].value, 250)
+        self.assertEqual(pivot["C3"].value, 1750)
+        self.assertEqual(pivot["D3"].value, 350)
         self.assertGreaterEqual(len(pivot._charts), 3)
 
     def test_booking_accepts_manual_customer_and_stores_it(self):

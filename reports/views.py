@@ -39,9 +39,12 @@ def _style_data_sheet(sheet, widths, money_columns=(), table_name=None):
                 cell.fill = ALTERNATE_FILL
         sheet.row_dimensions[row_number].height = 21
     for column in money_columns:
-        for (cell,) in sheet.iter_cols(min_col=column, max_col=column, min_row=2):
-            cell.number_format = MONEY_FORMAT
-            cell.alignment = Alignment(horizontal="right", vertical="center")
+        for column_cells in sheet.iter_cols(
+            min_col=column, max_col=column, min_row=2, max_row=sheet.max_row
+        ):
+            for cell in column_cells:
+                cell.number_format = MONEY_FORMAT
+                cell.alignment = Alignment(horizontal="right", vertical="center")
     for index, width in enumerate(widths, start=1):
         sheet.column_dimensions[get_column_letter(index)].width = width
     sheet.freeze_panes = "A2"

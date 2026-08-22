@@ -1,18 +1,22 @@
-import csv
 from collections import defaultdict
 from datetime import datetime
 from io import BytesIO
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
+from django.http import Http404
 from django.shortcuts import render
 from openpyxl import Workbook
 from openpyxl.chart import BarChart, DoughnutChart, LineChart, Reference
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.table import Table, TableStyleInfo
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
+from openpyxl.worksheet.table import Table as ExcelTable, TableStyleInfo
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table as PdfTable, TableStyle
 
 from dashboard.services import date_bounds, report_data
 
@@ -55,7 +59,7 @@ def _style_data_sheet(sheet, widths, money_columns=(), table_name=None):
     sheet.page_setup.fitToWidth, sheet.page_setup.fitToHeight = 1, 0
     sheet.sheet_view.zoomScale = 90
     if table_name and sheet.max_row > 1:
-        table = Table(displayName=table_name, ref=sheet.dimensions)
+        table = ExcelTable(displayName=table_name, ref=sheet.dimensions)
         table.tableStyleInfo = TableStyleInfo(name="TableStyleMedium4", showRowStripes=True)
         sheet.add_table(table)
 
@@ -180,6 +184,101 @@ def _build_excel_report(data, start, end):
     return workbook
 
 
+def _pdf_table(rows, widths=None, money_columns=()):
+    table = PdfTable(rows, colWidths=widths, repeatRows=1, hAlign="LEFT")
+    commands = [
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#128A4B")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 7),
+        ("TOPPADDING", (0, 0), (-1, 0), 7),
+        ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#DDE8E1")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F0F8F3")]),
+    ]
+    for column in money_columns:
+        commands.append(("ALIGN", (column, 1), (column, -1), "RIGHT"))
+    table.setStyle(TableStyle(commands))
+    return table
+
+
+def _pdf_page(canvas, document):
+    canvas.saveState()
+    canvas.setStrokeColor(colors.HexColor("#DDE8E1"))
+    canvas.line(document.leftMargin, 12 * mm, A4[1] - document.rightMargin, 12 * mm)
+    canvas.setFont("Helvetica", 8)
+    canvas.setFillColor(colors.HexColor("#607067"))
+    canvas.drawString(document.leftMargin, 8 * mm, "TurfIQ Business Report")
+    canvas.drawRightString(A4[1] - document.rightMargin, 8 * mm, f"Page {document.page}")
+    canvas.restoreState()
+
+
+def _build_pdf_report(data, start, end):
+    bookings, expenses = list(data["bookings"]), list(data["expenses"])
+    output = BytesIO()
+    document = SimpleDocTemplate(
+        output, pagesize=landscape(A4), rightMargin=14 * mm, leftMargin=14 * mm,
+        topMargin=14 * mm, bottomMargin=18 * mm,
+        title="TurfIQ Business Report", author="TurfIQ",
+    )
+    styles = getSampleStyleSheet()
+    title = ParagraphStyle("ReportTitle", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=22, leading=26, textColor=colors.HexColor("#0B5D32"), alignment=TA_CENTER, spaceAfter=5 * mm)
+    heading = ParagraphStyle("ReportHeading", parent=styles["Heading2"], fontName="Helvetica-Bold", fontSize=14, leading=18, textColor=colors.HexColor("#0B5D32"), spaceBefore=5 * mm, spaceAfter=3 * mm)
+    note = ParagraphStyle("ReportNote", parent=styles["BodyText"], fontSize=9, textColor=colors.HexColor("#607067"), alignment=TA_CENTER, spaceAfter=5 * mm)
+    money = lambda value: f"INR {float(value):,.2f}"
+    revenue_bookings = [booking for booking in bookings if booking.status != "Cancelled"]
+    pending = sum((booking.amount for booking in revenue_bookings if not booking.is_paid), 0)
+    average = data["revenue"] / max(len(revenue_bookings), 1)
+    story = [
+        Paragraph("TurfIQ Business Report", title),
+        Paragraph(f"Reporting period: {start:%d %b %Y} to {end:%d %b %Y}", note),
+        _pdf_table([
+            ["Revenue", "Expenses", "Net Profit", "Bookings", "Pending Collection", "Avg. Booking Value"],
+            [money(data["revenue"]), money(data["expense_total"]), money(data["profit"]), str(len(bookings)), money(pending), money(average)],
+        ], [42 * mm, 42 * mm, 42 * mm, 30 * mm, 46 * mm, 46 * mm]),
+        Paragraph("Booking Ledger", heading),
+    ]
+    booking_rows = [["Date", "Time", "Customer", "Sport", "Ground", "Duration", "Amount", "Payment", "Paid", "Status"]]
+    booking_rows.extend([
+        [booking.booking_date.strftime("%d-%b-%Y"), booking.booking_time.strftime("%I:%M %p"), booking.customer.name[:28], booking.sport,
+         str(booking.ground)[:22], f"{booking.duration} hrs", money(booking.amount), booking.payment_method,
+         "Yes" if booking.is_paid else "No", booking.status]
+        for booking in bookings
+    ])
+    if len(booking_rows) == 1:
+        booking_rows.append(["No bookings in the selected period", "", "", "", "", "", "", "", "", ""])
+    story.extend([_pdf_table(booking_rows, [23*mm, 20*mm, 39*mm, 25*mm, 32*mm, 20*mm, 28*mm, 24*mm, 15*mm, 24*mm], (6,)), PageBreak(), Paragraph("Expense Ledger", heading)])
+    expense_rows = [["Date", "Category", "Amount", "Notes"]]
+    expense_rows.extend([[expense.expense_date.strftime("%d-%b-%Y"), expense.category, money(expense.amount), expense.notes[:90]] for expense in expenses])
+    if len(expense_rows) == 1:
+        expense_rows.append(["No expenses in the selected period", "", "", ""])
+    story.append(_pdf_table(expense_rows, [32*mm, 58*mm, 38*mm, 138*mm], (2,)))
+
+    by_ground, by_payment, by_status, by_category = defaultdict(lambda: [0, 0.0]), defaultdict(lambda: [0, 0.0]), defaultdict(lambda: [0, 0.0]), defaultdict(float)
+    for booking in bookings:
+        by_status[booking.status][0] += 1
+        by_status[booking.status][1] += float(booking.amount)
+        if booking.status != "Cancelled":
+            by_ground[str(booking.ground)][0] += 1; by_ground[str(booking.ground)][1] += float(booking.amount)
+            by_payment[booking.payment_method][0] += 1; by_payment[booking.payment_method][1] += float(booking.amount)
+    for expense in expenses:
+        by_category[expense.category] += float(expense.amount)
+    analyses = [
+        ("Ground Performance", [["Ground", "Bookings", "Revenue"]] + [[key, value[0], money(value[1])] for key, value in sorted(by_ground.items())], [65*mm, 35*mm, 50*mm], (2,)),
+        ("Payment Methods", [["Payment", "Bookings", "Revenue"]] + [[key, value[0], money(value[1])] for key, value in sorted(by_payment.items())], [65*mm, 35*mm, 50*mm], (2,)),
+        ("Booking Status", [["Status", "Bookings", "Gross Amount"]] + [[key, value[0], money(value[1])] for key, value in sorted(by_status.items())], [65*mm, 35*mm, 50*mm], (2,)),
+        ("Expense Categories", [["Category", "Expense"]] + [[key, money(value)] for key, value in sorted(by_category.items(), key=lambda item: item[1], reverse=True)], [90*mm, 60*mm], (1,)),
+    ]
+    story.extend([PageBreak(), Paragraph("Business Analysis", heading)])
+    for section_title, rows, widths, money_columns in analyses:
+        if len(rows) == 1:
+            rows.append(["No data", *([""] * (len(rows[0]) - 1))])
+        story.append(KeepTogether([Paragraph(section_title, heading), _pdf_table(rows, widths, money_columns), Spacer(1, 3 * mm)]))
+    document.build(story, onFirstPage=_pdf_page, onLaterPages=_pdf_page)
+    return output.getvalue()
+
+
 @login_required
 def report_view(request):
     start, end, preset = date_bounds(request)
@@ -193,37 +292,14 @@ def export_report(request, format):
     start, end, _ = date_bounds(request)
     data = report_data(request.user, start, end)
     rows = data["bookings"]
-    if format == "csv":
-        response = HttpResponse(content_type="text/csv")
-        response["Content-Disposition"] = 'attachment; filename="turfiq-report.csv"'
-        writer = csv.writer(response)
-        writer.writerow(["Date", "Customer", "Phone", "Sport", "Ground", "Amount", "Payment", "Status"])
-        for booking in rows:
-            writer.writerow([booking.booking_date, booking.customer.name, booking.customer.phone, booking.sport, booking.ground, booking.amount, booking.payment_method, booking.status])
-        return response
     if format == "xlsx":
         output = BytesIO()
         _build_excel_report(data, start, end).save(output)
         response = HttpResponse(output.getvalue(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         response["Content-Disposition"] = 'attachment; filename="turfiq-report.xlsx"'
         return response
-
-    output = BytesIO()
-    pdf = canvas.Canvas(output, pagesize=A4)
-    y = 800
-    pdf.setFont("Helvetica-Bold", 16)
-    pdf.drawString(40, y, "TurfIQ Analytics Report")
-    y -= 28
-    pdf.setFont("Helvetica", 10)
-    pdf.drawString(40, y, f"{start} to {end}  |  Revenue: {data['revenue']}  |  Expenses: {data['expense_total']}  |  Profit: {data['profit']}")
-    y -= 30
-    for booking in rows:
-        if y < 50:
-            pdf.showPage()
-            y = 800
-        pdf.drawString(40, y, f"{booking.booking_date}  {booking.customer.name[:22]}  {booking.sport}  {booking.amount}  {booking.status}")
-        y -= 16
-    pdf.save()
-    response = HttpResponse(output.getvalue(), content_type="application/pdf")
-    response["Content-Disposition"] = 'attachment; filename="turfiq-report.pdf"'
-    return response
+    if format == "pdf":
+        response = HttpResponse(_build_pdf_report(data, start, end), content_type="application/pdf")
+        response["Content-Disposition"] = 'attachment; filename="turfiq-report.pdf"'
+        return response
+    raise Http404("Unsupported report format")

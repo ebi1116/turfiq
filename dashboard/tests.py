@@ -28,8 +28,19 @@ class DashboardTests(TestCase):
     def test_reports_and_crud_pages_render(self):
         for name in ("booking-list","expense-list","customer-list","reports","settings","profile"):
             self.assertEqual(self.client.get(reverse(name)).status_code,200,name)
-    def test_csv_export(self):
-        response=self.client.get(reverse("report-export",args=["csv"])); self.assertEqual(response.status_code,200); self.assertIn("text/csv",response["Content-Type"])
+    def test_csv_export_is_removed(self):
+        response = self.client.get(reverse("report-export", args=["csv"]))
+        self.assertEqual(response.status_code, 404)
+        reports_page = self.client.get(reverse("reports"))
+        self.assertNotContains(reports_page, "CSV data")
+
+    def test_pdf_export_contains_complete_report(self):
+        response = self.client.get(reverse("report-export", args=["pdf"]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn("turfiq-report.pdf", response["Content-Disposition"])
+        self.assertTrue(response.content.startswith(b"%PDF"))
+        self.assertGreater(len(response.content), 3000)
 
     def test_xlsx_export_has_professional_header_and_data_formatting(self):
         booking = Booking.objects.get(owner=self.user)

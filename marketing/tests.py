@@ -16,6 +16,8 @@ class MarketingSiteTests(TestCase):
         self.assertContains(response, "Know Your Turf")
         self.assertContains(response, 'name="description"')
         self.assertContains(response, 'property="og:title"')
+        self.assertContains(response, 'href="https://www.youtube.com/@turfiq_in"')
+        self.assertContains(response, 'aria-label="TurfIQ on YouTube"')
 
     def test_contact_form_stores_message(self):
         response = self.client.post(reverse("contact"), {"name": "Owner", "email": "owner@example.com", "phone": "9876543210", "subject": "Analytics question", "message": "Please help with my dashboard."})

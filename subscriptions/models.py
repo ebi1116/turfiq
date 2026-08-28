@@ -5,7 +5,7 @@ from datetime import timedelta
 
 
 def default_trial_end():
-    return timezone.now() + timedelta(days=7)
+    return timezone.now() + timedelta(days=30)
 
 
 class Subscription(models.Model):
@@ -14,7 +14,7 @@ class Subscription(models.Model):
     razorpay_subscription_id = models.CharField(max_length=80, unique=True, null=True, blank=True)
     razorpay_payment_id = models.CharField(max_length=80, blank=True)
     razorpay_plan_id = models.CharField(max_length=80, blank=True)
-    status = models.CharField(max_length=30, default="inactive", db_index=True)
+    status = models.CharField(max_length=30, default="trialing", db_index=True)
     trial_start = models.DateTimeField(default=timezone.now)
     trial_end = models.DateTimeField(default=default_trial_end)
     current_start = models.DateTimeField(null=True, blank=True)

@@ -63,7 +63,7 @@ Set `DJANGO_DEBUG=0`, `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `GOOGLE_OAUTH
 
 ### Razorpay Premium billing
 
-All non-superuser accounts receive a seven-day full-feature trial. They can authorize Razorpay autopay during the trial; billing begins when the trial ends and continues at ₹199/month. Create a monthly ₹199 plan in Razorpay and configure:
+All non-superuser accounts receive a 30-day free full-feature trial. After the trial, Premium access costs ₹199 for 30 days through a manual Razorpay payment. Configure:
 
 ```powershell
 $env:RAZORPAY_KEY_ID="rzp_test_..."

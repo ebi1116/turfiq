@@ -25,14 +25,10 @@ def billing(request):
     if request.user.is_superuser or is_test_account(request.user):
         return redirect("dashboard")
     subscription, _ = Subscription.objects.get_or_create(owner=request.user)
-    is_trial_checkout = not bool(subscription.razorpay_payment_id)
-    checkout_price = settings.TRIAL_ACTIVATION_PRICE if is_trial_checkout else settings.PREMIUM_MONTHLY_PRICE
     return render(request, "subscriptions/billing.html", {
         "subscription": subscription,
         "price": settings.PREMIUM_MONTHLY_PRICE,
-        "checkout_price": checkout_price,
-        "is_trial_checkout": is_trial_checkout,
-        "trial_days": settings.PREMIUM_TRIAL_DAYS,
+        "checkout_price": settings.PREMIUM_MONTHLY_PRICE,
         "standard_checkout_configured": all((settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)),
         "razorpay_key_id": settings.RAZORPAY_KEY_ID,
     })
@@ -52,8 +48,8 @@ def create_order(request):
     if payload is None:
         return JsonResponse({"error": "Invalid JSON body."}, status=400)
     subscription, _ = Subscription.objects.get_or_create(owner=request.user)
-    purpose = "trial" if not subscription.razorpay_payment_id else "premium"
-    expected_price = settings.TRIAL_ACTIVATION_PRICE if purpose == "trial" else settings.PREMIUM_MONTHLY_PRICE
+    purpose = "premium"
+    expected_price = settings.PREMIUM_MONTHLY_PRICE
     amount = expected_price * 100
     currency = str(payload.get("currency", "INR")).upper()
     if currency != "INR":
@@ -81,28 +77,17 @@ def verify_payment(request):
     pending = request.session.get("razorpay_pending_order", {})
     if payload["razorpay_order_id"] != pending.get("id"):
         return JsonResponse({"success": False, "error": "Payment order does not match this checkout."}, status=400)
-    if pending.get("amount") not in (
-        settings.TRIAL_ACTIVATION_PRICE * 100,
-        settings.PREMIUM_MONTHLY_PRICE * 100,
-    ) or pending.get("currency") != "INR":
+    if pending.get("amount") != settings.PREMIUM_MONTHLY_PRICE * 100 or pending.get("currency") != "INR":
         return JsonResponse({"success": False, "error": "Payment order details are invalid."}, status=400)
     if not verify_order_signature(payload["razorpay_order_id"], payload["razorpay_payment_id"], payload["razorpay_signature"]):
         return JsonResponse({"success": False, "error": "Invalid payment signature."}, status=400)
     subscription, _ = Subscription.objects.get_or_create(owner=request.user)
     subscription.razorpay_payment_id = payload["razorpay_payment_id"]
     now = timezone.now()
-    if pending.get("purpose") == "trial" and pending["amount"] == settings.TRIAL_ACTIVATION_PRICE * 100:
-        subscription.status = "trialing"
-        subscription.trial_start = now
-        subscription.trial_end = now + timedelta(days=settings.PREMIUM_TRIAL_DAYS)
-        subscription.current_start = now
-        subscription.current_end = subscription.trial_end
-        update_fields = ["razorpay_payment_id", "status", "trial_start", "trial_end", "current_start", "current_end", "updated_at"]
-    else:
-        subscription.status = "active"
-        subscription.current_start = now
-        subscription.current_end = now + timedelta(days=30)
-        update_fields = ["razorpay_payment_id", "status", "current_start", "current_end", "updated_at"]
+    subscription.status = "active"
+    subscription.current_start = now
+    subscription.current_end = now + timedelta(days=30)
+    update_fields = ["razorpay_payment_id", "status", "current_start", "current_end", "updated_at"]
     subscription.save(update_fields=update_fields)
     request.session.pop("razorpay_pending_order", None)
     return JsonResponse({"success": True, "redirect": request.session.pop("premium_return_to", "/dashboard/")})

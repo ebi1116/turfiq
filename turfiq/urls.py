@@ -16,6 +16,7 @@ urlpatterns = [
     path("accounts/login/", SignInPageView.as_view(), name="login"),
     path("accounts/logout/", LogoutView.as_view(), name="logout"),
     path("accounts/", include("allauth.urls")),
+    path("", include("accounts.urls")),
     path("profile/", ProfileView.as_view(), name="profile"),
     path("billing/", include("subscriptions.urls")),
     path("bookings/", include("bookings.urls")),

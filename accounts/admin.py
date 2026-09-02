@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import GoogleUserProfile
+from .models import GoogleUserProfile, PlayerProfile, CricketScorecard, PlayerPost, PlayerTeam
 
 
 @admin.register(GoogleUserProfile)
@@ -33,3 +33,8 @@ class GoogleUserProfileAdmin(admin.ModelAdmin):
         if obj.user.is_active != should_be_active:
             obj.user.is_active = should_be_active
             obj.user.save(update_fields=["is_active"])
+
+admin.site.register(PlayerProfile)
+admin.site.register(PlayerTeam)
+admin.site.register(CricketScorecard)
+admin.site.register(PlayerPost)

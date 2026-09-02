@@ -15,6 +15,10 @@ def role_login_redirect_url(user):
     """Return the landing page for this authenticated user only."""
     if user.is_superuser or user.is_staff:
         return reverse("admin:index")
+    if not hasattr(user, "google_profile") or not user.google_profile.role:
+        return reverse("choose-role")
+    if user.google_profile.role == "player":
+        return reverse("player-onboarding") if not hasattr(user, "player_profile") else reverse("player-dashboard")
     from business.models import BusinessSettings
     settings = BusinessSettings.objects.filter(owner=user).first()
     if hasattr(user, "google_profile") and (not settings or not settings.onboarding_completed):

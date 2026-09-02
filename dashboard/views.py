@@ -13,6 +13,8 @@ from .services import build_dashboard, ground_summaries, get_daily_booking_analy
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name="dashboard/index.html"
     def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and getattr(getattr(request.user, "google_profile", None), "role", None) == "player":
+            return redirect("player-dashboard")
         if request.user.is_authenticated and hasattr(request.user, "google_profile"):
             settings = BusinessSettings.objects.filter(owner=request.user).first()
             if not settings or not settings.onboarding_completed:

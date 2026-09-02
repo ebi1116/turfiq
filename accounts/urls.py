@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path("choose-role/", views.RoleSelectionView.as_view(), name="choose-role"),
+    path("switch-account-type/", views.AccountTypeSwitchView.as_view(), name="switch-account-type"),
     path("player/onboarding/", views.PlayerOnboardingView.as_view(), name="player-onboarding"),
     path("player/", views.PlayerDashboardView.as_view(), name="player-dashboard"),
     path("player/profile/", views.PlayerProfileView.as_view(), name="player-profile"),

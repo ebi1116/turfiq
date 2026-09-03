@@ -38,9 +38,8 @@ class PlayerRequiredMixin(LoginRequiredMixin):
 
 class RoleSelectionView(LoginRequiredMixin, TemplateView):
     template_name = "accounts/choose_role.html"
-    allow_change = False
     def dispatch(self, request, *args, **kwargs):
-        if not self.allow_change and request.user.is_authenticated and hasattr(request.user, "google_profile") and request.user.google_profile.role:
+        if request.user.is_authenticated and hasattr(request.user, "google_profile") and request.user.google_profile.role:
             return redirect(role_login_redirect_url(request.user))
         return super().dispatch(request, *args, **kwargs)
     def post(self, request, *args, **kwargs):
@@ -49,12 +48,7 @@ class RoleSelectionView(LoginRequiredMixin, TemplateView):
             messages.error(request, "Please choose an account type."); return redirect("choose-role")
         profile, _ = GoogleUserProfile.objects.get_or_create(user=request.user)
         profile.role = role; profile.save(update_fields=["role", "updated_at"])
-        messages.success(request, "Your account type has been updated. Your existing data is unchanged.")
         return redirect(role_login_redirect_url(request.user))
-
-
-class AccountTypeSwitchView(RoleSelectionView):
-    allow_change = True
 
 
 class PlayerOnboardingView(PlayerRequiredMixin, TemplateView):

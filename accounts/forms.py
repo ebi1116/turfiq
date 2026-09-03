@@ -45,3 +45,9 @@ class PlayerMatchRecordForm(forms.ModelForm):
         if user and hasattr(user, "player_profile"):
             self.fields["tournament"].queryset = self.fields["tournament"].queryset.filter(sport=user.player_profile.sport)
             self.initial.setdefault("sport", user.player_profile.sport)
+            if user.player_profile.sport == "Cricket":
+                self.fields.pop("goals")
+                self.fields.pop("assists")
+            else:
+                for field in ("runs", "balls", "wickets", "catches"):
+                    self.fields.pop(field)

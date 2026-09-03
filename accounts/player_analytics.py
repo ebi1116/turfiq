@@ -43,8 +43,11 @@ def _metrics(matches):
         matches=Count("id"), wins=Count("id", filter=Q(result="Won")),
         losses=Count("id", filter=Q(result="Lost")),
         goals=Sum("goals"), assists=Sum("assists"), rating=Avg("performance_rating"),
+        runs=Sum("runs"), wickets=Sum("wickets"), catches=Sum("catches"),
+        fifties=Count("id", filter=Q(runs__gte=50, runs__lt=100)),
+        centuries=Count("id", filter=Q(runs__gte=100)),
     )
-    values = {key: aggregate[key] or 0 for key in ("matches", "wins", "losses", "goals", "assists")}
+    values = {key: aggregate[key] or 0 for key in ("matches", "wins", "losses", "goals", "assists", "runs", "wickets", "catches", "fifties", "centuries")}
     values["rating"] = round(float(aggregate["rating"]), 1) if aggregate["rating"] is not None else None
     decided = values["wins"] + values["losses"]
     values["win_rate"] = round(values["wins"] / decided * 100) if decided else 0

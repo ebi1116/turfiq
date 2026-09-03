@@ -9,8 +9,9 @@ from django.utils import timezone
 from business.views import SettingsView
 from django.urls import reverse_lazy
 from .adapters import role_login_redirect_url
-from .models import GoogleUserProfile, PlayerProfile, CricketScorecard, PlayerPost
-from .forms import PlayerProfileForm, PlayerPostForm
+from .models import GoogleUserProfile, PlayerProfile, CricketScorecard, PlayerPost, PlayerMatchRecord
+from .forms import PlayerProfileForm, PlayerPostForm, PlayerMatchRecordForm
+from .player_analytics import player_analytics
 from tournaments.models import Tournament, Match, Team
 
 
@@ -94,8 +95,9 @@ class PlayerDashboardView(PlayerRequiredMixin, TemplateView):
     template_name = "player/dashboard.html"
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs); profile = self.request.user.player_profile; stats = player_stats(self.request.user)
+        analytics = player_analytics(self.request.user, self.request.GET.get("period", "month"))
         nearby = Tournament.objects.filter(status="Registration Open", sport=profile.sport, venue__icontains=profile.location).order_by("start_date")
-        ctx.update(profile=profile, stats=stats, nearby_tournaments=nearby[:4], recent_cards=stats["cards"].order_by("-match__date")[:4], posts=PlayerPost.objects.select_related("player").order_by("-created_at")[:3])
+        ctx.update(profile=profile, stats=stats, analytics=analytics, periods=(("week", "This Week"), ("month", "This Month"), ("quarter", "Last 3 Months"), ("all", "All Time")), nearby_tournaments=nearby[:4], recent_cards=stats["cards"].order_by("-match__date")[:4], posts=PlayerPost.objects.select_related("player").order_by("-created_at")[:3])
         return ctx
 
 
@@ -136,7 +138,27 @@ class PlayerMatchesView(PlayerRequiredMixin, TemplateView):
         result = self.request.GET.get("result")
         if result == "won": cards = cards.filter(match__winner_id__in=self.request.user.team_memberships.values("team_id"))
         elif result == "lost": cards = cards.exclude(match__winner_id__in=self.request.user.team_memberships.values("team_id")).filter(match__status="Completed")
-        ctx["cards"] = cards; return ctx
+        records = PlayerMatchRecord.objects.filter(player=self.request.user).select_related("tournament")
+        if result == "won": records = records.filter(result="Won")
+        elif result == "lost": records = records.filter(result="Lost")
+        ctx.update(cards=cards, records=records); return ctx
+
+
+class PlayerMatchRecordCreateView(PlayerRequiredMixin, TemplateView):
+    template_name = "player/match_form.html"
+
+    def get_context_data(self, **kwargs):
+        return {**super().get_context_data(**kwargs), "form": PlayerMatchRecordForm(user=self.request.user)}
+
+    def post(self, request, *args, **kwargs):
+        form = PlayerMatchRecordForm(request.POST, user=request.user)
+        if form.is_valid():
+            record = form.save(commit=False)
+            record.player = request.user
+            record.save()
+            messages.success(request, "Match performance recorded. Your statistics are updated.")
+            return redirect("player-dashboard")
+        return self.render_to_response({"form": form})
 
 
 class PlayerScorecardView(PlayerRequiredMixin, TemplateView):

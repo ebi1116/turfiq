@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
@@ -72,6 +73,36 @@ class CricketScorecard(models.Model):
     def strike_rate(self): return round((self.runs / self.balls * 100), 1) if self.balls else 0
     @property
     def economy(self): return round((self.runs_conceded / float(self.overs)), 2) if self.overs else 0
+
+
+class PlayerMatchRecord(models.Model):
+    """A player-entered record for a real match outside an owner scorecard."""
+    RESULTS = [("Won", "Won"), ("Lost", "Lost"), ("Draw", "Draw / Tie")]
+    player = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="match_records")
+    tournament = models.ForeignKey("tournaments.Tournament", on_delete=models.SET_NULL, null=True, blank=True, related_name="player_match_records")
+    sport = models.CharField(max_length=30, default="Cricket")
+    team_name = models.CharField(max_length=120)
+    opponent_name = models.CharField(max_length=120)
+    match_date = models.DateField(db_index=True)
+    venue = models.CharField(max_length=150, blank=True)
+    result = models.CharField(max_length=10, choices=RESULTS)
+    # Universal match-performance fields.  Cricket-specific figures below are
+    # retained so a single record model can support every TurfIQ sport.
+    goals = models.PositiveIntegerField(default=0)
+    assists = models.PositiveIntegerField(default=0)
+    performance_rating = models.DecimalField(max_digits=3, decimal_places=1, null=True, blank=True, validators=[MinValueValidator(0), MaxValueValidator(10)])
+    runs = models.PositiveIntegerField(default=0)
+    balls = models.PositiveIntegerField(default=0)
+    wickets = models.PositiveIntegerField(default=0)
+    catches = models.PositiveIntegerField(default=0)
+    notes = models.CharField(max_length=300, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-match_date", "-created_at")
+
+    def __str__(self):
+        return f"{self.team_name} vs {self.opponent_name}"
 
 
 class PlayerPost(models.Model):

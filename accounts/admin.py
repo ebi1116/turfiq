@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import GoogleUserProfile, PlayerProfile, CricketScorecard, PlayerPost, PlayerTeam
+from .models import GoogleUserProfile, PlayerProfile, CricketScorecard, PlayerPost, PlayerTeam, PlayerMatchRecord
 
 
 @admin.register(GoogleUserProfile)
@@ -38,3 +38,4 @@ admin.site.register(PlayerProfile)
 admin.site.register(PlayerTeam)
 admin.site.register(CricketScorecard)
 admin.site.register(PlayerPost)
+admin.site.register(PlayerMatchRecord)

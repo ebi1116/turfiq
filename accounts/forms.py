@@ -1,5 +1,5 @@
 from django import forms
-from .models import PlayerProfile, PlayerPost
+from .models import PlayerProfile, PlayerPost, PlayerMatchRecord
 
 
 class PlayerProfileForm(forms.ModelForm):
@@ -28,3 +28,20 @@ class PlayerPostForm(forms.ModelForm):
         model = PlayerPost
         fields = ("image", "video", "caption", "sport", "tournament", "turf_tag")
         widgets = {"caption": forms.Textarea(attrs={"rows": 3, "placeholder": "Share a match moment…"})}
+
+
+class PlayerMatchRecordForm(forms.ModelForm):
+    class Meta:
+        model = PlayerMatchRecord
+        fields = ("tournament", "sport", "team_name", "opponent_name", "match_date", "venue", "result", "goals", "assists", "performance_rating", "runs", "balls", "wickets", "catches", "notes")
+        widgets = {
+            "match_date": forms.DateInput(attrs={"type": "date"}),
+            "notes": forms.Textarea(attrs={"rows": 2, "placeholder": "Optional match note"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop("user", None)
+        super().__init__(*args, **kwargs)
+        if user and hasattr(user, "player_profile"):
+            self.fields["tournament"].queryset = self.fields["tournament"].queryset.filter(sport=user.player_profile.sport)
+            self.initial.setdefault("sport", user.player_profile.sport)

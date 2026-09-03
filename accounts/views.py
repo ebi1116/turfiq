@@ -51,6 +51,22 @@ class RoleSelectionView(LoginRequiredMixin, TemplateView):
         return redirect(role_login_redirect_url(request.user))
 
 
+class AccountTypeSwitchView(LoginRequiredMixin, TemplateView):
+    """Let an existing account enter either of its TurfIQ experiences."""
+    template_name = "accounts/switch_account.html"
+
+    def post(self, request, *args, **kwargs):
+        role = request.POST.get("role")
+        if role not in (GoogleUserProfile.Role.PLAYER, GoogleUserProfile.Role.OWNER):
+            messages.error(request, "Please choose a valid account type.")
+            return redirect("switch-account-type")
+        profile, _ = GoogleUserProfile.objects.get_or_create(user=request.user)
+        profile.role = role
+        profile.save(update_fields=["role", "updated_at"])
+        messages.success(request, "You are now in your %s workspace." % profile.get_role_display())
+        return redirect(role_login_redirect_url(request.user))
+
+
 class PlayerOnboardingView(PlayerRequiredMixin, TemplateView):
     template_name = "player/onboarding.html"
     def dispatch(self, request, *args, **kwargs):

@@ -51,6 +51,8 @@ def _metrics(matches):
     values["rating"] = round(float(aggregate["rating"]), 1) if aggregate["rating"] is not None else None
     decided = values["wins"] + values["losses"]
     values["win_rate"] = round(values["wins"] / decided * 100) if decided else 0
+    values["average_goals"] = round(values["goals"] / values["matches"], 1) if values["matches"] else 0
+    values["average_assists"] = round(values["assists"] / values["matches"], 1) if values["matches"] else 0
     values["score"] = _score(matches, values)
     return values
 
@@ -71,6 +73,37 @@ def _trend(records):
     return result
 
 
+def _tournament_stats(user, records):
+    """Return participation and verified tournament titles for a player."""
+    from tournaments.models import Tournament
+
+    team_ids = list(user.team_memberships.values_list("team_id", flat=True))
+    record_tournament_ids = records.exclude(tournament__isnull=True).values_list("tournament_id", flat=True)
+    tournaments = Tournament.objects.filter(Q(id__in=record_tournament_ids) | Q(teams__id__in=team_ids)).distinct()
+    titles = 0
+    for tournament in tournaments.filter(status="Completed"):
+        final = tournament.matches.filter(status="Completed").order_by("-number").first()
+        if final and final.winner_id in team_ids:
+            titles += 1
+    return {"participated": tournaments.count(), "won": titles}
+
+
+def _current_form(records):
+    results = list(records.order_by("-match_date", "-created_at").values_list("result", flat=True)[:5])
+    if not results:
+        return {"label": "No form yet", "detail": "Record a match to start your form guide.", "wins": 0, "total": 0}
+    wins = results.count("Won")
+    if wins >= 4:
+        label = "Excellent form"
+    elif wins >= 3:
+        label = "In form"
+    elif wins >= 1:
+        label = "Building momentum"
+    else:
+        label = "Ready to bounce back"
+    return {"label": label, "detail": f"{wins} win{'s' if wins != 1 else ''} in your last {len(results)} matches", "wins": wins, "total": len(results)}
+
+
 def player_analytics(user, period="month"):
     period = period if period in PERIODS else "month"
     today = timezone.localdate()
@@ -81,6 +114,7 @@ def player_analytics(user, period="month"):
     metrics = _metrics(selected)
     week = _metrics(records.filter(match_date__gte=today - timedelta(days=6)))
     month = _metrics(records.filter(match_date__gte=today - timedelta(days=30)))
+    tournament_stats = _tournament_stats(user, records)
 
     insight = "Record your completed matches to unlock a personalised performance insight."
     if metrics["matches"]:
@@ -98,4 +132,5 @@ def player_analytics(user, period="month"):
         "period": period, "period_label": PERIODS[period][0], "metrics": metrics, "all_metrics": all_metrics,
         "week_metrics": week, "month_metrics": month, "records": selected.order_by("-match_date", "-created_at"),
         "recent_matches": records.order_by("-match_date", "-created_at")[:5], "trend": _trend(selected), "insight": insight,
+        "tournament_stats": tournament_stats, "current_form": _current_form(records),
     }

@@ -1,8 +1,8 @@
 from django.urls import path
-from .views import ContactView, MarketingPageView, robots_txt, sitemap_xml
+from .views import ContactView, HomeView, MarketingPageView, robots_txt, sitemap_xml
 
 urlpatterns = [
-    path("", MarketingPageView.as_view(template_name="marketing/home.html"), name="home"),
+    path("", HomeView.as_view(), name="home"),
     path("about/", MarketingPageView.as_view(template_name="marketing/about.html"), name="about"),
     path("contact/", ContactView.as_view(), name="contact"),
     path("contact/thank-you/", MarketingPageView.as_view(template_name="marketing/contact_thank_you.html"), name="contact-thank-you"),

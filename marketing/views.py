@@ -8,10 +8,30 @@ from django.views.decorators.cache import never_cache
 from django.shortcuts import render
 
 from .forms import ContactForm
+from accounts.models import GoogleUserProfile
+from accounts.player_analytics import player_analytics
 
 
 class MarketingPageView(TemplateView):
     pass
+
+
+class HomeView(TemplateView):
+    """Public homepage with a private, data-backed player preview when available."""
+
+    template_name = "marketing/home.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        profile = getattr(self.request.user, "google_profile", None)
+        is_player = bool(
+            self.request.user.is_authenticated
+            and profile
+            and profile.role == GoogleUserProfile.Role.PLAYER
+        )
+        context["is_player"] = is_player
+        context["player_home_analytics"] = player_analytics(self.request.user, "all") if is_player else None
+        return context
 
 
 class ContactView(CreateView):

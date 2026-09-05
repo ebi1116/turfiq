@@ -1,12 +1,12 @@
 from django.contrib import admin
 
-from .models import GoogleUserProfile, PlayerProfile, CricketScorecard, PlayerPost, PlayerTeam, PlayerMatchRecord
+from .models import GoogleUserProfile
 
 
 @admin.register(GoogleUserProfile)
 class GoogleUserProfileAdmin(admin.ModelAdmin):
-    list_display = ("full_name", "email", "google_id", "role", "status", "joined", "last_login")
-    list_filter = ("role", "status", "user__is_active")
+    list_display = ("full_name", "email", "google_id", "status", "joined", "last_login")
+    list_filter = ("status", "user__is_active")
     search_fields = ("user__first_name", "user__last_name", "user__email", "google_id")
     readonly_fields = ("google_id", "profile_picture", "updated_at")
     list_select_related = ("user",)
@@ -33,9 +33,3 @@ class GoogleUserProfileAdmin(admin.ModelAdmin):
         if obj.user.is_active != should_be_active:
             obj.user.is_active = should_be_active
             obj.user.save(update_fields=["is_active"])
-
-admin.site.register(PlayerProfile)
-admin.site.register(PlayerTeam)
-admin.site.register(CricketScorecard)
-admin.site.register(PlayerPost)
-admin.site.register(PlayerMatchRecord)

@@ -16,10 +16,6 @@ class PremiumAccessMiddleware:
     def __call__(self, request):
         user = request.user
         request.is_test_account = is_test_account(user)
-        if user.is_authenticated and getattr(getattr(user, "google_profile", None), "role", None) == "player":
-            # Player features are not part of the turf-owner billing gate.
-            request.has_premium_access = True
-            return self.get_response(request)
         if user.is_authenticated and not user.is_superuser and not request.is_test_account:
             is_allowed = request.path.startswith(self.ALLOWED_PREFIXES)
             if request.path == reverse("logout"):

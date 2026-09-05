@@ -87,7 +87,6 @@ class AuthenticationTests(TestCase):
         self.assertFalse(user.has_usable_password())
         self.assertEqual(profile.google_id, "google-sub-123")
         self.assertEqual(profile.profile_picture, "https://example.com/asha.jpg")
-        self.assertEqual(profile.role, GoogleUserProfile.Role.OWNER)
         self.assertEqual(profile.status, GoogleUserProfile.Status.ACTIVE)
 
     def test_disabled_google_owner_is_logged_out(self):

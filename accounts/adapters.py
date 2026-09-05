@@ -12,13 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 def role_login_redirect_url(user):
-    """Return the landing page for this authenticated user only."""
+    """Return the owner workspace landing page for this authenticated user."""
     if user.is_superuser or user.is_staff:
         return reverse("admin:index")
-    if not hasattr(user, "google_profile") or not user.google_profile.role:
-        return reverse("choose-role")
-    if user.google_profile.role == "player":
-        return reverse("player-onboarding") if not hasattr(user, "player_profile") else reverse("player-dashboard")
     from business.models import BusinessSettings
     settings = BusinessSettings.objects.filter(owner=user).first()
     if hasattr(user, "google_profile") and (not settings or not settings.onboarding_completed):
@@ -27,7 +23,7 @@ def role_login_redirect_url(user):
 
 
 class TurfIQAccountAdapter(DefaultAccountAdapter):
-    """Apply the same role-based landing page to allauth/Google logins."""
+    """Apply the owner-workspace landing page to allauth/Google logins."""
 
     def get_login_redirect_url(self, request):
         return role_login_redirect_url(request.user)

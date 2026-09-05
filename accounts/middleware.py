@@ -16,9 +16,4 @@ class ActiveGoogleUserMiddleware:
             if profile and profile.status == GoogleUserProfile.Status.DISABLED:
                 logout(request)
                 return redirect("home")
-            # Keep the owner workspace inaccessible to player accounts even
-            # when a saved/bookmarked owner URL is opened directly.
-            owner_prefixes = ("/dashboard/", "/bookings/", "/expenses/", "/reports/", "/settings/")
-            if profile and profile.role == GoogleUserProfile.Role.PLAYER and request.path.startswith(owner_prefixes):
-                return redirect("player-dashboard")
         return self.get_response(request)

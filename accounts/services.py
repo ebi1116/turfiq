@@ -30,8 +30,6 @@ def sync_google_profile(user, account):
     profile, _ = GoogleUserProfile.objects.get_or_create(user=user)
     profile.google_id = account.uid
     profile.profile_picture = data.get("picture", "")
-    # Role is selected by the user after their first Google sign-in. Never
-    # overwrite an existing choice when Google refreshes profile details.
     profile.status = GoogleUserProfile.Status.ACTIVE
     profile.save()
     return profile

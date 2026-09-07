@@ -151,7 +151,10 @@ def build_dashboard(user, ground=None):
     monthly_counts=list(all_bookings.filter(booking_date__gte=today-timedelta(days=365)).annotate(period=TruncMonth("booking_date")).values("period").annotate(v=Count("id")).order_by("period"))
     payment=list(qs.values("payment_method").annotate(v=Count("id"))); sports=list(qs.values("sport").annotate(v=Count("id")))
     hours={h:0 for h in range(6,24)}
-    for row in qs.values("booking_time").annotate(v=Count("id")): hours[row["booking_time"].hour]=row["v"]
+    # Day Wise historical entries intentionally have no time, so they count
+    # toward booking and revenue totals but cannot belong to an hourly bucket.
+    for row in qs.exclude(booking_time__isnull=True).values("booking_time").annotate(v=Count("id")):
+        hours[row["booking_time"].hour] = row["v"]
     goal=float(settings.monthly_revenue_goal or 1); goal_pct=min(float(month_r)/goal*100,100)
     most_dates=list(all_bookings.values("booking_date").annotate(total=Count("id")).order_by("-total", "-booking_date")[:5])
     avg_revenue=float(total_r/count) if count else 0

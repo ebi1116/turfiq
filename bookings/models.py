@@ -21,14 +21,16 @@ class Customer(models.Model):
     def __str__(self): return f"{self.name} — {self.phone}" if self.phone else self.name
 
 class Booking(models.Model):
+    BOOKING_TYPES = [("DAY", "Day Wise"), ("SLOT", "Time / Slot Wise")]
     SPORTS = [(x, x) for x in ("Football", "Cricket", "Badminton", "Other")]
     PAYMENTS = [(x, x) for x in ("UPI", "Cash", "Card", "Online")]
     STATUSES = [(x, x) for x in ("Confirmed", "Completed", "Cancelled", "Pending")]
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="bookings")
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="bookings")
+    booking_type = models.CharField(max_length=4, choices=BOOKING_TYPES, default="SLOT", db_index=True)
     booking_date = models.DateField(db_index=True)
-    booking_time = models.TimeField()
-    duration = models.DecimalField(max_digits=4, decimal_places=1, help_text="Duration in hours")
+    booking_time = models.TimeField(null=True, blank=True)
+    duration = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True, help_text="Duration in hours")
     sport = models.CharField(max_length=20, choices=SPORTS)
     ground = models.ForeignKey(Ground, on_delete=models.PROTECT, related_name="bookings")
     amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -48,6 +50,8 @@ class Booking(models.Model):
             raise ValidationError(errors)
     @property
     def end_time(self):
+        if self.booking_time is None or self.duration is None:
+            return None
         return (datetime.combine(self.booking_date, self.booking_time) + timedelta(hours=float(self.duration))).time()
     class Meta: ordering = ["-booking_date", "-booking_time"]
     def __str__(self): return f"{self.customer} — {self.booking_date}"

@@ -41,6 +41,7 @@ def get_daily_booking_analytics(selected_date, ground, now=None):
     candidates = Booking.objects.filter(
         owner=ground.owner, ground=ground,
         booking_date__range=(selected_date - timedelta(days=1), selected_date + timedelta(days=1)),
+        booking_type="SLOT",
     ).exclude(status="Cancelled").select_related("customer")
     bookings = []
     for booking in candidates:

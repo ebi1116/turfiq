@@ -33,7 +33,7 @@ class BookingForm(forms.ModelForm):
     class Meta:
         model = Booking
         fields = (
-            "booking_date", "booking_time", "duration", "sport",
+            "booking_type", "booking_date", "booking_time", "duration", "sport",
             "ground", "amount", "payment_method", "status", "is_paid", "notes",
         )
         widgets = {
@@ -48,7 +48,13 @@ class BookingForm(forms.ModelForm):
         user = kwargs.pop("user", None)
         self._user = user
         super().__init__(*args, **kwargs)
-        self.order_fields(("customer_name", "customer_phone", "booking_date", "booking_time", "duration", "sport", "ground", "amount", "payment_method", "status", "is_paid", "notes"))
+        self.order_fields(("customer_name", "customer_phone", "booking_type", "booking_date", "booking_time", "duration", "sport", "ground", "amount", "payment_method", "status", "is_paid", "notes"))
+        self.fields["booking_type"].widget = forms.RadioSelect()
+        self.fields["booking_type"].required = False
+        self.fields["booking_time"].required = False
+        self.fields["duration"].required = False
+        if not self.is_bound and not self.instance.pk:
+            self.initial["booking_type"] = "DAY"
         if self.instance and self.instance.pk and self.instance.customer_id:
             self.fields["customer_name"].initial = self.instance.customer.name
             self.fields["customer_phone"].initial = self.instance.customer.phone
@@ -85,6 +91,16 @@ class BookingForm(forms.ModelForm):
         booking_date = cleaned_data.get("booking_date")
         booking_time = cleaned_data.get("booking_time")
         duration = cleaned_data.get("duration")
+        booking_type = cleaned_data.get("booking_type") or "SLOT"
+        cleaned_data["booking_type"] = booking_type
+        if booking_type == "DAY":
+            cleaned_data["booking_time"] = None
+            cleaned_data["duration"] = None
+            return cleaned_data
+        if not booking_time:
+            self.add_error("booking_time", "Booking time is required for a Time / Slot Wise booking.")
+        if duration is None:
+            self.add_error("duration", "Duration is required for a Time / Slot Wise booking.")
         if not all((ground, booking_date, booking_time, duration)) or duration <= 0:
             return cleaned_data
 

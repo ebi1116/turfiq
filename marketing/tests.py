@@ -38,6 +38,8 @@ class MarketingSiteTests(TestCase):
         self.assertEqual(manifest["display"], "standalone")
         self.assertEqual(manifest["start_url"], "/dashboard/")
         self.assertGreaterEqual(len(manifest["icons"]), 2)
+        self.assertEqual(manifest["icons"][0]["src"], "/static/images/turfiq-app-icon-192.png")
+        self.assertEqual(manifest["icons"][1]["src"], "/static/images/turfiq-app-icon-512.png")
 
         worker = self.client.get(reverse("service-worker"))
         self.assertEqual(worker.status_code, 200)

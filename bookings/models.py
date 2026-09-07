@@ -3,6 +3,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.db.models.functions import Lower, Trim
+from datetime import datetime, timedelta
 from business.models import Ground
 
 class Customer(models.Model):
@@ -45,6 +46,9 @@ class Booking(models.Model):
             errors["ground"] = "Ground must belong to the booking owner."
         if errors:
             raise ValidationError(errors)
+    @property
+    def end_time(self):
+        return (datetime.combine(self.booking_date, self.booking_time) + timedelta(hours=float(self.duration))).time()
     class Meta: ordering = ["-booking_date", "-booking_time"]
     def __str__(self): return f"{self.customer} — {self.booking_date}"
 

@@ -77,8 +77,8 @@ def webmanifest(request):
         "orientation": "any", "background_color": "#f4f7f5", "theme_color": "#10231c",
         "categories": ["business", "productivity", "sports"],
         "icons": [
-            {"src": "/static/images/turfiq-profile-logo-v2.png", "sizes": "1254x1254", "type": "image/png", "purpose": "any"},
-            {"src": "/static/images/turfiq-premium-logo.png", "sizes": "1254x1254", "type": "image/png", "purpose": "maskable"},
+            {"src": "/static/images/turfiq-app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": "/static/images/turfiq-app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
         ],
         "shortcuts": [
             {"name": "New booking", "short_name": "Book", "url": "/bookings/add/"},

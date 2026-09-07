@@ -1,12 +1,13 @@
 {% load static %}
-const CACHE_NAME = 'turfiq-shell-v1';
+const CACHE_NAME = 'turfiq-shell-v2';
 const OFFLINE_URL = '/offline/';
 const SHELL_ASSETS = [
   OFFLINE_URL,
   "{% static 'css/app.css' %}",
   "{% static 'css/responsive.css' %}",
   "{% static 'js/app.js' %}",
-  "{% static 'images/turfiq-profile-logo-v2.png' %}",
+  "/static/images/turfiq-app-icon-192.png",
+  "/static/images/turfiq-app-icon-512.png",
   "{% static 'images/turfiq-favicon-v1.png' %}"
 ];
 

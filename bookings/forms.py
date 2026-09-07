@@ -1,5 +1,6 @@
 from django import forms
 from django.db.models import Q
+from datetime import datetime, timedelta
 from .models import Booking, Customer
 from business.models import Ground
 
@@ -76,3 +77,29 @@ class BookingForm(forms.ModelForm):
 
     def clean_customer_phone(self):
         return self.cleaned_data["customer_phone"].strip()
+
+    def clean(self):
+        """Reject reservations that overlap an active reservation on a ground."""
+        cleaned_data = super().clean()
+        ground = cleaned_data.get("ground")
+        booking_date = cleaned_data.get("booking_date")
+        booking_time = cleaned_data.get("booking_time")
+        duration = cleaned_data.get("duration")
+        if not all((ground, booking_date, booking_time, duration)) or duration <= 0:
+            return cleaned_data
+
+        requested_start = datetime.combine(booking_date, booking_time)
+        requested_end = requested_start + timedelta(hours=float(duration))
+        candidates = Booking.objects.filter(
+            owner=self._user, ground=ground,
+            booking_date__range=(booking_date - timedelta(days=1), booking_date + timedelta(days=1)),
+        ).exclude(status="Cancelled")
+        if self.instance.pk:
+            candidates = candidates.exclude(pk=self.instance.pk)
+        for booking in candidates.only("booking_time", "duration"):
+            existing_start = datetime.combine(booking.booking_date, booking.booking_time)
+            existing_end = existing_start + timedelta(hours=float(booking.duration))
+            if requested_start < existing_end and requested_end > existing_start:
+                self.add_error("booking_time", "This turf is already booked for the selected time.")
+                break
+        return cleaned_data

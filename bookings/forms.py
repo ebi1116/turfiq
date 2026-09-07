@@ -24,7 +24,7 @@ class CustomerForm(forms.ModelForm):
 
 class BookingForm(forms.ModelForm):
     customer_name = forms.CharField(max_length=120, label="Customer or Team name", widget=forms.TextInput(attrs={"autocomplete": "off", "role": "combobox", "aria-autocomplete": "list", "aria-controls": "customerSuggestions"}))
-    customer_phone = forms.CharField(max_length=20, required=False, label="Mobile number (optional)")
+    customer_phone = forms.CharField(max_length=20, required=False, label="Mobile number")
     ground = forms.CharField(
         label="Ground",
         widget=forms.TextInput(attrs={"list": "ground-options", "autocomplete": "off", "placeholder": "Type or select a ground"}),
@@ -49,12 +49,16 @@ class BookingForm(forms.ModelForm):
         self._user = user
         super().__init__(*args, **kwargs)
         self.order_fields(("customer_name", "customer_phone", "booking_type", "booking_date", "booking_time", "duration", "sport", "ground", "amount", "payment_method", "status", "is_paid", "notes"))
-        self.fields["booking_type"].widget = forms.RadioSelect()
+        # Reuse the model field choices when replacing the default select widget.
+        # A bare RadioSelect has no choices and would render an empty toggle.
+        self.fields["booking_type"].widget = forms.RadioSelect(choices=self.fields["booking_type"].choices)
         self.fields["booking_type"].required = False
         self.fields["booking_time"].required = False
         self.fields["duration"].required = False
         if not self.is_bound and not self.instance.pk:
             self.initial["booking_type"] = "DAY"
+        for field_name in ("booking_date", "sport", "ground", "amount", "payment_method", "status"):
+            self.fields[field_name].label = self.fields[field_name].label.rstrip(" *")
         if self.instance and self.instance.pk and self.instance.customer_id:
             self.fields["customer_name"].initial = self.instance.customer.name
             self.fields["customer_phone"].initial = self.instance.customer.phone

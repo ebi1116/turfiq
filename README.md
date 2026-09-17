@@ -63,7 +63,7 @@ Set `DJANGO_DEBUG=0`, `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `GOOGLE_OAUTH
 
 ### Razorpay Premium billing
 
-All non-superuser accounts receive a 7-day free full-feature trial. After the trial, Premium access costs ₹99 for 30 days through a manual Razorpay payment. Configure:
+New accounts pay ₹2 to activate a 7-day full-feature trial. After the trial, Premium access costs ₹99 for 30 days through a manual Razorpay payment. Configure:
 
 ```powershell
 $env:RAZORPAY_KEY_ID="rzp_test_..."

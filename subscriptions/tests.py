@@ -13,14 +13,14 @@ from .models import Subscription
 
 
 class PremiumAccessTests(TestCase):
-    def test_regular_owner_without_subscription_starts_free_trial(self):
+    def test_regular_owner_without_subscription_must_activate_trial(self):
         user = User.objects.create_user("free-owner", password="password")
         self.client.force_login(user)
         response = self.client.get(reverse("dashboard"))
         self.assertEqual(response.status_code, 200)
         subscription = Subscription.objects.get(owner=user)
-        self.assertEqual(subscription.status, "trialing")
-        self.assertTrue(subscription.has_access)
+        self.assertEqual(subscription.status, "pending")
+        self.assertFalse(subscription.has_access)
 
     def test_expired_trial_owner_is_sent_to_billing_when_opening_booking(self):
         user = User.objects.create_user("saving-owner", password="password")
@@ -29,16 +29,24 @@ class PremiumAccessTests(TestCase):
         response = self.client.get(reverse("booking-add"))
         self.assertRedirects(response, reverse("billing"))
 
-    def test_new_owner_receives_free_trial_and_can_create_bookings(self):
+    def test_expired_trial_owner_can_open_settings(self):
+        user = User.objects.create_user("settings-owner", password="password")
+        Subscription.objects.create(owner=user, status="trialing", trial_end=timezone.now() - timedelta(seconds=1))
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("settings"))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_new_owner_must_activate_trial_before_creating_bookings(self):
         user = User.objects.create_user("new-owner", email="new-owner@example.com", password="password")
         self.client.force_login(user)
         response = self.client.post(reverse("customer-add"), {"name": "Free Customer", "phone": "888"})
         self.assertRedirects(response, reverse("customer-list"))
-        self.assertEqual(self.client.get(reverse("booking-add")).status_code, 200)
+        self.assertRedirects(self.client.get(reverse("booking-add")), reverse("billing"))
         subscription = Subscription.objects.get(owner=user)
-        self.assertEqual(subscription.status, "trialing")
-        self.assertTrue(subscription.has_access)
-        self.assertAlmostEqual((subscription.trial_end - subscription.trial_start).total_seconds(), 7 * 86400, delta=2)
+        self.assertEqual(subscription.status, "pending")
+        self.assertFalse(subscription.has_access)
 
     def test_one_owners_payment_does_not_activate_another_email(self):
         paid = User.objects.create_user("paid", email="paid@example.com", password="password")
@@ -48,9 +56,9 @@ class PremiumAccessTests(TestCase):
 
         response = self.client.get(reverse("booking-list"))
 
-        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(response, reverse("billing"))
         unpaid_subscription = Subscription.objects.get(owner=unpaid)
-        self.assertEqual(unpaid_subscription.status, "trialing")
+        self.assertEqual(unpaid_subscription.status, "pending")
         self.assertNotEqual(unpaid_subscription.status, "active")
 
     def test_active_owner_can_open_dashboard(self):
@@ -99,7 +107,7 @@ class PremiumAccessTests(TestCase):
         self.assertIn("csrftoken", response.cookies)
 
     @override_settings(TEST_ACCOUNT_EMAIL="demo@turfiq.local")
-    def test_configured_test_account_bypasses_premium_and_billing(self):
+    def test_configured_test_account_bypasses_premium_and_can_view_billing(self):
         user = User.objects.create_user("demo", "demo@turfiq.local", "password")
         Subscription.objects.create(owner=user, status="trialing", trial_end=timezone.now() - timedelta(seconds=1))
         self.client.force_login(user)
@@ -107,7 +115,9 @@ class PremiumAccessTests(TestCase):
         response = self.client.post(reverse("customer-add"), {"name": "Demo Customer", "phone": "777"})
 
         self.assertRedirects(response, reverse("customer-list"))
-        self.assertRedirects(self.client.get(reverse("billing")), reverse("dashboard"))
+        response = self.client.get(reverse("billing"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Premium membership")
 
 
 @override_settings(RAZORPAY_KEY_ID="rzp_test_public", RAZORPAY_KEY_SECRET="test-secret")
@@ -117,28 +127,28 @@ class StandardCheckoutTests(TestCase):
         self.client.force_login(self.user)
 
     @patch("subscriptions.views.create_razorpay_order")
-    def test_create_order_ignores_client_amount_and_uses_monthly_price(self, create):
-        create.return_value = {"id": "order_test", "amount": 9900, "currency": "INR"}
+    def test_create_order_ignores_client_amount_and_uses_trial_activation_price(self, create):
+        create.return_value = {"id": "order_test", "amount": 200, "currency": "INR"}
         response = self.client.post(
             reverse("create-order"),
             json.dumps({"amount": 99, "currency": "INR"}),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
-        create.assert_called_once_with(9900, "INR", create.call_args.args[2])
+        create.assert_called_once_with(200, "INR", create.call_args.args[2])
 
     @patch("subscriptions.views.create_razorpay_order")
     def test_create_order_returns_checkout_fields_and_stores_pending_order(self, create):
-        create.return_value = {"id": "order_test", "amount": 9900, "currency": "INR"}
+        create.return_value = {"id": "order_test", "amount": 200, "currency": "INR"}
         response = self.client.post(
             reverse("create-order"),
-            json.dumps({"amount": 9900, "currency": "INR"}),
+            json.dumps({"amount": 200, "currency": "INR"}),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
-        self.assertJSONEqual(response.content, {"order_id": "order_test", "amount": 9900, "currency": "INR"})
+        self.assertJSONEqual(response.content, {"order_id": "order_test", "amount": 200, "currency": "INR"})
         self.assertEqual(self.client.session["razorpay_pending_order"]["id"], "order_test")
-        self.assertEqual(self.client.session["razorpay_pending_order"]["purpose"], "premium")
+        self.assertEqual(self.client.session["razorpay_pending_order"]["purpose"], "trial_activation")
 
     def test_verify_payment_rejects_missing_fields(self):
         response = self.client.post(reverse("verify-payment"), "{}", content_type="application/json")
@@ -147,7 +157,7 @@ class StandardCheckoutTests(TestCase):
 
     def test_verify_payment_rejects_signature_mismatch_without_activating(self):
         session = self.client.session
-        session["razorpay_pending_order"] = {"id": "order_test", "amount": 9900, "currency": "INR", "purpose": "premium"}
+        session["razorpay_pending_order"] = {"id": "order_test", "amount": 200, "currency": "INR", "purpose": "trial_activation"}
         session.save()
         response = self.client.post(
             reverse("verify-payment"),
@@ -155,11 +165,11 @@ class StandardCheckoutTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 400)
-        self.assertFalse(Subscription.objects.filter(owner=self.user, status="active").exists())
+        self.assertFalse(Subscription.objects.filter(owner=self.user, status="trialing").exists())
 
-    def test_verify_payment_accepts_valid_signature_and_activates_premium(self):
+    def test_verify_payment_accepts_valid_signature_and_activates_trial(self):
         session = self.client.session
-        session["razorpay_pending_order"] = {"id": "order_test", "amount": 9900, "currency": "INR", "purpose": "premium"}
+        session["razorpay_pending_order"] = {"id": "order_test", "amount": 200, "currency": "INR", "purpose": "trial_activation"}
         session.save()
         signature = hmac.new(b"test-secret", b"order_test|pay_test", hashlib.sha256).hexdigest()
         response = self.client.post(
@@ -169,9 +179,9 @@ class StandardCheckoutTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         subscription = Subscription.objects.get(owner=self.user)
-        self.assertEqual(subscription.status, "active")
+        self.assertEqual(subscription.status, "trialing")
         self.assertEqual(subscription.razorpay_payment_id, "pay_test")
-        self.assertAlmostEqual((subscription.current_end - subscription.current_start).total_seconds(), 30 * 86400, delta=2)
+        self.assertAlmostEqual((subscription.trial_end - subscription.trial_start).total_seconds(), 7 * 86400, delta=2)
 
     @patch("subscriptions.views.create_razorpay_order")
     def test_expired_paid_trial_uses_monthly_price(self, create):

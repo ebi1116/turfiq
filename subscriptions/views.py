@@ -11,7 +11,6 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 
 from .models import Subscription, WebhookEvent
-from .access import is_test_account
 from .services import (
     RazorpayAuthError, RazorpayError, create_razorpay_order,
     timestamp, verify_checkout_signature, verify_order_signature,
@@ -22,13 +21,14 @@ from .services import (
 @login_required
 @ensure_csrf_cookie
 def billing(request):
-    if request.user.is_superuser or is_test_account(request.user):
+    if request.user.is_superuser:
         return redirect("dashboard")
     subscription, _ = Subscription.objects.get_or_create(owner=request.user)
     return render(request, "subscriptions/billing.html", {
         "subscription": subscription,
         "price": settings.PREMIUM_MONTHLY_PRICE,
         "checkout_price": settings.PREMIUM_MONTHLY_PRICE,
+        "trial_activation_price": settings.PREMIUM_TRIAL_ACTIVATION_PRICE,
         "standard_checkout_configured": all((settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)),
         "razorpay_key_id": settings.RAZORPAY_KEY_ID,
     })
@@ -48,8 +48,12 @@ def create_order(request):
     if payload is None:
         return JsonResponse({"error": "Invalid JSON body."}, status=400)
     subscription, _ = Subscription.objects.get_or_create(owner=request.user)
-    purpose = "premium"
-    expected_price = settings.PREMIUM_MONTHLY_PRICE
+    if subscription.status == "pending":
+        purpose = "trial_activation"
+        expected_price = settings.PREMIUM_TRIAL_ACTIVATION_PRICE
+    else:
+        purpose = "premium"
+        expected_price = settings.PREMIUM_MONTHLY_PRICE
     amount = expected_price * 100
     currency = str(payload.get("currency", "INR")).upper()
     if currency != "INR":
@@ -77,17 +81,31 @@ def verify_payment(request):
     pending = request.session.get("razorpay_pending_order", {})
     if payload["razorpay_order_id"] != pending.get("id"):
         return JsonResponse({"success": False, "error": "Payment order does not match this checkout."}, status=400)
-    if pending.get("amount") != settings.PREMIUM_MONTHLY_PRICE * 100 or pending.get("currency") != "INR":
+    expected_price = (
+        settings.PREMIUM_TRIAL_ACTIVATION_PRICE
+        if pending.get("purpose") == "trial_activation"
+        else settings.PREMIUM_MONTHLY_PRICE
+    )
+    if pending.get("amount") != expected_price * 100 or pending.get("currency") != "INR":
         return JsonResponse({"success": False, "error": "Payment order details are invalid."}, status=400)
+    subscription, _ = Subscription.objects.get_or_create(owner=request.user)
+    is_trial_activation = pending.get("purpose") == "trial_activation"
+    if is_trial_activation != (subscription.status == "pending"):
+        return JsonResponse({"success": False, "error": "Payment order is not valid for this subscription."}, status=400)
     if not verify_order_signature(payload["razorpay_order_id"], payload["razorpay_payment_id"], payload["razorpay_signature"]):
         return JsonResponse({"success": False, "error": "Invalid payment signature."}, status=400)
-    subscription, _ = Subscription.objects.get_or_create(owner=request.user)
-    subscription.razorpay_payment_id = payload["razorpay_payment_id"]
     now = timezone.now()
-    subscription.status = "active"
-    subscription.current_start = now
-    subscription.current_end = now + timedelta(days=30)
-    update_fields = ["razorpay_payment_id", "status", "current_start", "current_end", "updated_at"]
+    subscription.razorpay_payment_id = payload["razorpay_payment_id"]
+    if pending.get("purpose") == "trial_activation":
+        subscription.status = "trialing"
+        subscription.trial_start = now
+        subscription.trial_end = now + timedelta(days=settings.PREMIUM_TRIAL_DAYS)
+        update_fields = ["razorpay_payment_id", "status", "trial_start", "trial_end", "updated_at"]
+    else:
+        subscription.status = "active"
+        subscription.current_start = now
+        subscription.current_end = now + timedelta(days=30)
+        update_fields = ["razorpay_payment_id", "status", "current_start", "current_end", "updated_at"]
     subscription.save(update_fields=update_fields)
     request.session.pop("razorpay_pending_order", None)
     return JsonResponse({"success": True, "redirect": request.session.pop("premium_return_to", "/dashboard/")})

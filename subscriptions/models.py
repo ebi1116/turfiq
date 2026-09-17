@@ -5,7 +5,7 @@ from datetime import timedelta
 
 
 def default_trial_end():
-    return timezone.now() + timedelta(days=30)
+    return timezone.now() + timedelta(days=settings.PREMIUM_TRIAL_DAYS)
 
 
 class Subscription(models.Model):

@@ -38,7 +38,7 @@ class PremiumAccessTests(TestCase):
         subscription = Subscription.objects.get(owner=user)
         self.assertEqual(subscription.status, "trialing")
         self.assertTrue(subscription.has_access)
-        self.assertAlmostEqual((subscription.trial_end - subscription.trial_start).total_seconds(), 30 * 86400, delta=2)
+        self.assertAlmostEqual((subscription.trial_end - subscription.trial_start).total_seconds(), 7 * 86400, delta=2)
 
     def test_one_owners_payment_does_not_activate_another_email(self):
         paid = User.objects.create_user("paid", email="paid@example.com", password="password")
@@ -79,7 +79,7 @@ class PremiumAccessTests(TestCase):
         self.client.force_login(user)
         response = self.client.get(reverse("billing"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "199")
+        self.assertContains(response, "99")
 
     @override_settings(RAZORPAY_KEY_ID="rzp_test_public", RAZORPAY_KEY_SECRET="test-secret")
     def test_billing_page_uses_standard_checkout_not_legacy_autopay(self):
@@ -118,25 +118,25 @@ class StandardCheckoutTests(TestCase):
 
     @patch("subscriptions.views.create_razorpay_order")
     def test_create_order_ignores_client_amount_and_uses_monthly_price(self, create):
-        create.return_value = {"id": "order_test", "amount": 19900, "currency": "INR"}
+        create.return_value = {"id": "order_test", "amount": 9900, "currency": "INR"}
         response = self.client.post(
             reverse("create-order"),
             json.dumps({"amount": 99, "currency": "INR"}),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
-        create.assert_called_once_with(19900, "INR", create.call_args.args[2])
+        create.assert_called_once_with(9900, "INR", create.call_args.args[2])
 
     @patch("subscriptions.views.create_razorpay_order")
     def test_create_order_returns_checkout_fields_and_stores_pending_order(self, create):
-        create.return_value = {"id": "order_test", "amount": 19900, "currency": "INR"}
+        create.return_value = {"id": "order_test", "amount": 9900, "currency": "INR"}
         response = self.client.post(
             reverse("create-order"),
-            json.dumps({"amount": 19900, "currency": "INR"}),
+            json.dumps({"amount": 9900, "currency": "INR"}),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
-        self.assertJSONEqual(response.content, {"order_id": "order_test", "amount": 19900, "currency": "INR"})
+        self.assertJSONEqual(response.content, {"order_id": "order_test", "amount": 9900, "currency": "INR"})
         self.assertEqual(self.client.session["razorpay_pending_order"]["id"], "order_test")
         self.assertEqual(self.client.session["razorpay_pending_order"]["purpose"], "premium")
 
@@ -147,7 +147,7 @@ class StandardCheckoutTests(TestCase):
 
     def test_verify_payment_rejects_signature_mismatch_without_activating(self):
         session = self.client.session
-        session["razorpay_pending_order"] = {"id": "order_test", "amount": 19900, "currency": "INR", "purpose": "premium"}
+        session["razorpay_pending_order"] = {"id": "order_test", "amount": 9900, "currency": "INR", "purpose": "premium"}
         session.save()
         response = self.client.post(
             reverse("verify-payment"),
@@ -159,7 +159,7 @@ class StandardCheckoutTests(TestCase):
 
     def test_verify_payment_accepts_valid_signature_and_activates_premium(self):
         session = self.client.session
-        session["razorpay_pending_order"] = {"id": "order_test", "amount": 19900, "currency": "INR", "purpose": "premium"}
+        session["razorpay_pending_order"] = {"id": "order_test", "amount": 9900, "currency": "INR", "purpose": "premium"}
         session.save()
         signature = hmac.new(b"test-secret", b"order_test|pay_test", hashlib.sha256).hexdigest()
         response = self.client.post(
@@ -181,8 +181,8 @@ class StandardCheckoutTests(TestCase):
             razorpay_payment_id="pay_trial",
             trial_end=timezone.now() - timedelta(seconds=1),
         )
-        create.return_value = {"id": "order_renew", "amount": 19900, "currency": "INR"}
+        create.return_value = {"id": "order_renew", "amount": 9900, "currency": "INR"}
         response = self.client.post(reverse("create-order"), json.dumps({"currency": "INR"}), content_type="application/json")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["amount"], 19900)
+        self.assertEqual(response.json()["amount"], 9900)
         self.assertEqual(self.client.session["razorpay_pending_order"]["purpose"], "premium")
